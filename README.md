@@ -14,6 +14,8 @@ Blogify is a Next.js app that turns a company website and supporting blog URLs i
 - provides copy-to-clipboard actions for article sections, prompts, and link suggestions
 - runs a quality gate that rewrites drafts until they clear the editorial threshold
 - supports regeneration with reviewer comments
+- prepares LinkedIn carousel prompts after article approval
+- supports LinkedIn OAuth connection, approval, scheduling, and publish-now actions
 - stores every workflow artifact locally for later reuse
 
 ## Main screens
@@ -21,6 +23,7 @@ Blogify is a Next.js app that turns a company website and supporting blog URLs i
 - `/` landing page with the sync form and saved profiles
 - `/runs/[runId]` workspace for analysis and topic approval
 - `/runs/[runId]/blog/[slug]` article preview, regeneration, and approval flow
+- `/runs/[runId]/blog/[slug]/linkedin` LinkedIn publishing workflow for the approved article
 
 ## UI stack
 
@@ -62,6 +65,10 @@ Important variables:
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL` defaults to `gpt-5.4-mini`
 - `OPENAI_ENABLE_WEB_SEARCH` can be set to `false` to disable web search for topic generation
+- `LINKEDIN_CLIENT_ID`
+- `LINKEDIN_CLIENT_SECRET`
+- `LINKEDIN_REDIRECT_URI`
+- `LINKEDIN_SCOPE` defaults to `w_member_social`
 
 ## Workflow artifacts
 
@@ -83,6 +90,7 @@ Key files:
 - `blog-revisions.json`
 - `regeneration-notes.json`
 - `approvals.json`
+- `linkedin.json`
 
 ## Notes
 
@@ -90,5 +98,7 @@ Key files:
 - Topic suggestions are deduplicated against existing blog coverage before they are shown for approval.
 - The generated blog body is capped at 1200 words.
 - The blog preview page supports regeneration comments and explicit approval or revision decisions.
+- Approving a blog can generate a LinkedIn publishing pack with 4 carousel-ready prompts, then hand off to the LinkedIn workflow page.
+- LinkedIn publish state is stored per article slug inside `linkedin.json`.
 - The current storage layer is local filesystem-based, which is fine for development but not durable on Vercel serverless. For production on Vercel, swap `lib/storage.ts` to persistent storage such as Vercel Blob, Postgres, or KV.
 - CMS publishing is not wired yet. The output is generated as publication-ready markdown for the next handoff step.

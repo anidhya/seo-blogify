@@ -120,6 +120,85 @@ export const blogApprovalSchema = z.object({
   publishStatus: z.enum(["approved", "needs_review"])
 });
 
+export const linkedInCarouselPromptSchema = z.object({
+  slideNumber: z.number(),
+  title: z.string(),
+  prompt: z.string(),
+  designNotes: z.string()
+});
+
+export const linkedInDraftSchema = z.object({
+  articleSlug: z.string(),
+  headline: z.string(),
+  caption: z.string(),
+  carouselPrompts: z.array(linkedInCarouselPromptSchema).length(4),
+  hashtags: z.array(z.string()).min(3).max(10),
+  callToAction: z.string(),
+  publishStatus: z.enum(["draft", "ready", "scheduled", "published", "failed"]),
+  reviewStatus: z.enum(["draft", "pending_review", "approved", "needs_revision"])
+});
+
+export const linkedInConnectionSchema = z.object({
+  connected: z.boolean(),
+  connectedAt: z.string().nullable(),
+  updatedAt: z.string(),
+  memberUrn: z.string().nullable(),
+  memberName: z.string().nullable(),
+  accessToken: z.string().nullable(),
+  expiresAt: z.string().nullable()
+});
+
+export const linkedInApprovalSchema = z.object({
+  approvalId: z.string(),
+  createdAt: z.string(),
+  approved: z.boolean(),
+  notes: z.string()
+});
+
+export const linkedInScheduleSchema = z.object({
+  scheduleId: z.string(),
+  createdAt: z.string(),
+  scheduledFor: z.string(),
+  timezone: z.string(),
+  status: z.enum(["scheduled", "published", "cancelled"]),
+  publishedAt: z.string().nullable(),
+  notes: z.string()
+});
+
+export const linkedInPublicationSchema = z.object({
+  publicationId: z.string(),
+  createdAt: z.string(),
+  publishedAt: z.string().nullable(),
+  postUrn: z.string().nullable(),
+  externalUrl: z.string().nullable(),
+  status: z.enum(["draft", "published", "failed"]),
+  error: z.string().nullable()
+});
+
+export const linkedInRecordSchema = z.object({
+  articleSlug: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  draft: linkedInDraftSchema.nullable(),
+  connection: linkedInConnectionSchema.nullable(),
+  approvals: z.array(linkedInApprovalSchema),
+  schedule: linkedInScheduleSchema.nullable(),
+  publication: linkedInPublicationSchema.nullable()
+});
+
+export const linkedInRunRecordSchema = linkedInRecordSchema.extend({
+  runId: z.string(),
+  schemaVersion: z.literal("1")
+});
+
+export const linkedInArticlesRecordSchema = z.object({
+  runId: z.string(),
+  schemaVersion: z.literal("1"),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  articles: z.array(linkedInRecordSchema)
+});
+
 export const approvedArticleSchema = z.object({
   articleId: z.string(),
   articleSlug: z.string(),
@@ -142,7 +221,20 @@ export const approvedArticlesSchema = z.object({
 });
 
 export const workflowProgressSchema = z.object({
-  action: z.enum(["analyze", "suggest-topics", "generate-blog", "update-blog", "regenerate-blog", "approve-blog"]).nullable(),
+  action: z
+    .enum([
+      "analyze",
+      "suggest-topics",
+      "generate-blog",
+      "update-blog",
+      "regenerate-blog",
+      "approve-blog",
+      "prepare-linkedin",
+      "approve-linkedin",
+      "schedule-linkedin",
+      "publish-linkedin"
+    ])
+    .nullable(),
   percent: z.number(),
   stageLabel: z.string(),
   updatedAt: z.string(),
@@ -191,7 +283,8 @@ export const manifestSchema = z.object({
     analysis: z.boolean(),
     topics: z.boolean(),
     approvedTopic: z.boolean(),
-    blog: z.boolean()
+    blog: z.boolean(),
+    linkedin: z.boolean()
   })
 });
 

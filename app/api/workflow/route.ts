@@ -5,6 +5,7 @@ import {
   generateApprovedBlog,
   evaluateBlogQuality,
   generateStructuredAnalysis,
+  generateLinkedInDraft,
   generateTopicSuggestions,
   rewriteBlogDraft
 } from "@/lib/openai";
@@ -16,11 +17,23 @@ import {
   mergeExistingTopics,
   validateTopicCandidates
 } from "@/lib/topic-dedup";
-import type { BlogQuality, BrandAnalysis, TopicSuggestion, WorkflowInput, WorkflowStep } from "@/lib/types";
+import type {
+  BlogQuality,
+  BrandAnalysis,
+  GeneratedBlog,
+  TopicSuggestion,
+  WorkflowInput,
+  WorkflowStep,
+  LinkedInDraft
+} from "@/lib/types";
 import { NextResponse } from "next/server";
 import {
   createRun,
   loadRun,
+  saveLinkedInDraft,
+  saveLinkedInApproval,
+  saveLinkedInPublication,
+  saveLinkedInSchedule,
   saveApprovedArticle,
   saveExistingTopics,
   saveApprovedTopic,
@@ -36,6 +49,7 @@ import {
   saveTopics,
   updateManifest
 } from "@/lib/storage";
+import { publishLinkedInPost } from "@/lib/linkedin";
 
 type RequestBody = {
   step: WorkflowStep;
@@ -101,6 +115,122 @@ function formatInternalLinkHints(run: Awaited<ReturnType<typeof loadRun>>) {
   }
 
   return hints.length > 0 ? hints.join("\n") : "No link targets available.";
+}
+
+function buildLinkedInPrompt(params: {
+  blog: GeneratedBlog;
+  analysis: BrandAnalysis;
+  topic: TopicSuggestion;
+  input: WorkflowInput;
+}) {
+  return [
+    "Create a LinkedIn publishing pack from this approved article.",
+    "Return exactly 4 carousel-ready slide prompts.",
+    "Keep one coherent visual system across all slides: same palette, same typography style, same art direction, and consistent layout logic.",
+    "Each slide should be useful on its own and collectively tell one clear story.",
+    "Also return a LinkedIn headline, caption, CTA, and hashtags.",
+    "The caption should sound natural on LinkedIn, not like a blog excerpt.",
+    "The carousel prompts should be ready to hand off to a design or image generation workflow later.",
+    "Use the article's thesis, key takeaways, and FAQ themes as the source of truth.",
+    "",
+    `Article title: ${params.blog.title}`,
+    `Article slug: ${params.blog.slug}`,
+    `Article summary: ${params.blog.summary}`,
+    `Article markdown:\n${params.blog.markdown}`,
+    "",
+    `Approved topic:\n${JSON.stringify(params.topic, null, 2)}`,
+    "",
+    `Brand analysis:\n${JSON.stringify(params.analysis, null, 2)}`,
+    "",
+    `Workflow input:\n${JSON.stringify(params.input, null, 2)}`
+  ].join("\n");
+}
+
+function buildFallbackLinkedInDraft(params: {
+  blog: GeneratedBlog;
+  topic: TopicSuggestion;
+}): LinkedInDraft {
+  const focus = params.topic.primaryKeyword || params.blog.meta.keywords[0] || params.blog.title;
+  const caption = `${params.blog.summary}\n\nIf you're building around ${focus}, this carousel breaks the idea into a simple, usable framework.`;
+
+  return {
+    articleSlug: params.blog.slug,
+    headline: params.blog.title,
+    caption,
+    carouselPrompts: [
+      {
+        slideNumber: 1,
+        title: `Hook: ${params.topic.title}`,
+        prompt: `Design a bold LinkedIn carousel cover for the article "${params.blog.title}". Use a strong hook about ${focus}, premium editorial styling, high contrast typography, and one central concept only.`,
+        designNotes: "Use the same palette and typography across all slides."
+      },
+      {
+        slideNumber: 2,
+        title: "Why it matters",
+        prompt: `Create a slide that frames the problem and why ${focus} matters right now. Keep the layout clean, one statistic or insight, and a strong visual hierarchy.`,
+        designNotes: "Use a concise subhead and one supporting callout."
+      },
+      {
+        slideNumber: 3,
+        title: "Framework",
+        prompt: `Create a process slide that breaks ${params.blog.title} into 3 simple steps or pillars. Make it easy to scan, with numbered blocks and lots of whitespace.`,
+        designNotes: "Match the cover palette and spacing rhythm."
+      },
+      {
+        slideNumber: 4,
+        title: "CTA",
+        prompt: "Create a closing slide with a clear takeaway and a subtle call-to-action to read the full article. Keep it polished, minimal, and consistent with the rest of the carousel.",
+        designNotes: "Finish with the same visual system and a strong CTA zone."
+      }
+    ],
+    hashtags: [focus, params.topic.seoAngle, "LinkedInMarketing", "ContentStrategy"].map((item) =>
+      item.toLowerCase().replace(/\s+/g, "")
+    ),
+    callToAction: `Read the full article for the complete breakdown of ${focus}.`,
+    publishStatus: "draft",
+    reviewStatus: "pending_review"
+  };
+}
+
+function getLinkedInArticleRecord(run: Awaited<ReturnType<typeof loadRun>>, articleSlug: string) {
+  return run.linkedin?.articles.find((article) => article.articleSlug === articleSlug) ?? null;
+}
+
+async function generateLinkedInDraftForRun(params: {
+  run: Awaited<ReturnType<typeof loadRun>>;
+}) {
+  if (!params.run.blog?.blog || !params.run.analysis || !params.run.input) {
+    throw new Error("Saved run data is incomplete.");
+  }
+
+  const articleBlog = params.run.blog.blog;
+  const topic =
+    params.run.approvedTopic?.approvedTopic ?? {
+      title: articleBlog.title,
+      primaryKeyword: articleBlog.meta.keywords[0] ?? articleBlog.title,
+      searchIntent: "LinkedIn promotion",
+      rankingRationale: "Approved article from the current run.",
+      seoAngle: "Social distribution",
+      outline: []
+    };
+
+  try {
+    const draft = await generateLinkedInDraft(
+      buildLinkedInPrompt({
+        blog: articleBlog,
+        analysis: params.run.analysis.analysis,
+        topic,
+        input: params.run.input
+      })
+    );
+
+    return draft;
+  } catch {
+    return buildFallbackLinkedInDraft({
+      blog: articleBlog,
+      topic
+    });
+  }
 }
 
 async function setProgress(
@@ -569,6 +699,154 @@ export async function POST(request: Request) {
       });
     }
 
+    if (step === "prepare-linkedin") {
+      const runId = body.runId;
+      const articleSlug = body.articleSlug;
+
+      if (!runId || !articleSlug) {
+        return NextResponse.json({ error: "Run ID and article slug are required." }, { status: 400 });
+      }
+
+      const run = await loadRun(runId);
+      if (!run.blog?.blog) {
+        return NextResponse.json({ error: "Saved blog data is incomplete." }, { status: 400 });
+      }
+
+      await setProgress(runId, "prepare-linkedin", 20, "Preparing LinkedIn carousel prompts");
+      const linkedinDraft = await generateLinkedInDraftForRun({ run });
+      await setProgress(runId, "prepare-linkedin", 70, "Saving LinkedIn draft");
+      await saveLinkedInDraft(runId, linkedinDraft);
+      await updateManifest(runId, { steps: { linkedin: true } });
+      await setProgress(runId, "prepare-linkedin", 100, "LinkedIn draft ready", true);
+
+      return NextResponse.json({
+        runId,
+        draft: linkedinDraft
+      });
+    }
+
+    if (step === "approve-linkedin") {
+      const runId = body.runId;
+      const articleSlug = body.articleSlug;
+      if (!runId || !articleSlug) {
+        return NextResponse.json({ error: "Run ID and article slug are required." }, { status: 400 });
+      }
+
+      const run = await loadRun(runId);
+      const linkedInRecord = getLinkedInArticleRecord(run, articleSlug);
+      if (!linkedInRecord?.draft) {
+        return NextResponse.json({ error: "LinkedIn draft is not available." }, { status: 400 });
+      }
+
+      const approved = Boolean(body.approved);
+      const notes = body.comments?.trim() ?? "";
+      await setProgress(runId, "approve-linkedin", 25, "Recording LinkedIn approval");
+      const approval = await saveLinkedInApproval(runId, articleSlug, {
+        approvalId: `li-approval-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        approved,
+        notes
+      });
+      await setProgress(runId, "approve-linkedin", 100, approved ? "LinkedIn content approved" : "LinkedIn content needs revision", true);
+
+      return NextResponse.json({
+        runId,
+        approved,
+        approval
+      });
+    }
+
+    if (step === "schedule-linkedin") {
+      const runId = body.runId;
+      const articleSlug = body.articleSlug;
+      const scheduledFor = (body.payload as { scheduledFor?: string } | undefined)?.scheduledFor;
+      const notes = body.comments?.trim() ?? "";
+
+      if (!runId || !articleSlug || !scheduledFor) {
+        return NextResponse.json(
+          { error: "Run ID, article slug, and scheduled time are required." },
+          { status: 400 }
+        );
+      }
+
+      const run = await loadRun(runId);
+      const linkedInRecord = getLinkedInArticleRecord(run, articleSlug);
+      if (!linkedInRecord?.draft) {
+        return NextResponse.json({ error: "LinkedIn draft is not available." }, { status: 400 });
+      }
+
+      if (linkedInRecord.draft.reviewStatus !== "approved") {
+        return NextResponse.json({ error: "Approve the LinkedIn content before scheduling." }, { status: 400 });
+      }
+
+      await setProgress(runId, "schedule-linkedin", 20, "Saving LinkedIn schedule");
+      const schedule = await saveLinkedInSchedule(runId, articleSlug, {
+        scheduleId: `li-schedule-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        scheduledFor,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata",
+        status: "scheduled",
+        publishedAt: null,
+        notes
+      });
+      await setProgress(runId, "schedule-linkedin", 100, "LinkedIn scheduled", true);
+
+      return NextResponse.json({
+        runId,
+        schedule
+      });
+    }
+
+    if (step === "publish-linkedin") {
+      const runId = body.runId;
+      const articleSlug = body.articleSlug;
+
+      if (!runId || !articleSlug) {
+        return NextResponse.json({ error: "Run ID and article slug are required." }, { status: 400 });
+      }
+
+      const run = await loadRun(runId);
+      const linkedInRecord = getLinkedInArticleRecord(run, articleSlug);
+      if (!linkedInRecord?.draft) {
+        return NextResponse.json({ error: "LinkedIn draft is not available." }, { status: 400 });
+      }
+
+      if (linkedInRecord.draft.reviewStatus !== "approved") {
+        return NextResponse.json({ error: "Approve the LinkedIn content before publishing." }, { status: 400 });
+      }
+
+      const connection = linkedInRecord.connection;
+      if (!connection?.connected || !connection.accessToken || !connection.memberUrn) {
+        return NextResponse.json(
+          { error: "Connect a LinkedIn account before publishing now." },
+          { status: 400 }
+        );
+      }
+
+      await setProgress(runId, "publish-linkedin", 20, "Publishing to LinkedIn");
+      const published = await publishLinkedInPost({
+        accessToken: connection.accessToken,
+        authorUrn: connection.memberUrn,
+        text: `${linkedInRecord.draft.headline}\n\n${linkedInRecord.draft.caption}`,
+        articleUrl: run.input?.websiteUrl || undefined
+      });
+      await saveLinkedInPublication(runId, articleSlug, {
+        publicationId: `li-publication-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        publishedAt: new Date().toISOString(),
+        postUrn: published.postUrn,
+        externalUrl: published.externalUrl,
+        status: "published",
+        error: null
+      });
+      await setProgress(runId, "publish-linkedin", 100, "LinkedIn post published", true);
+
+      return NextResponse.json({
+        runId,
+        published
+      });
+    }
+
     if (step === "regenerate-blog") {
       const runId = body.runId;
       const comments = (body as RequestBody & { comments?: string }).comments?.trim();
@@ -726,6 +1004,7 @@ export async function POST(request: Request) {
       const notes = body.comments?.trim() ?? "";
       const score = run.quality?.quality.score ?? null;
       const articleSlug = body.articleSlug ?? run.blog.blog.slug;
+      const articleBlog = run.blog.blog;
 
       if (approved && (score === null || score < 80)) {
         return NextResponse.json(
@@ -774,9 +1053,17 @@ export async function POST(request: Request) {
         approvalStatus: approved ? "approved" : "needs_revision",
         feedbackCount: run.revisions?.revisions.filter((revision) => revision.articleSlug === articleSlug).length ?? 0
       });
+
+      if (approved) {
+        await setProgress(runId, "approve-blog", 55, "Generating LinkedIn carousel prompts");
+        const linkedinDraft = await generateLinkedInDraftForRun({ run });
+        await saveLinkedInDraft(runId, linkedinDraft);
+        await updateManifest(runId, { steps: { blog: true, linkedin: true } });
+      }
+
       await updateManifest(runId, {
         status: approved ? "approved" : "needs_review",
-        steps: { blog: true }
+        steps: { blog: true, linkedin: approved }
       });
       await setProgress(runId, "approve-blog", 100, approved ? "Approved" : "Marked for revision", true);
 
@@ -784,7 +1071,8 @@ export async function POST(request: Request) {
         runId,
         approved,
         status: publishStatus,
-        score
+        score,
+        linkedinUrl: approved ? `/runs/${runId}/blog/${articleSlug}/linkedin` : null
       });
     }
 

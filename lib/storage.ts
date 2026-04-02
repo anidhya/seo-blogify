@@ -10,6 +10,13 @@ import {
   blogRevisionSchema,
   existingTopicSchema,
   generatedBlogSchema,
+  linkedInApprovalSchema,
+  linkedInConnectionSchema,
+  linkedInDraftSchema,
+  linkedInPublicationSchema,
+  linkedInRecordSchema,
+  linkedInArticlesRecordSchema,
+  linkedInScheduleSchema,
   manifestSchema,
   pageSnapshotSchema,
   researchSchema,
@@ -34,11 +41,28 @@ import type {
   TopicSuggestion,
   TopicValidation,
   WorkflowProgress,
-  WorkflowInput
+  WorkflowInput,
+  LinkedInApproval,
+  LinkedInConnection,
+  LinkedInDraft,
+  LinkedInPublication,
+  LinkedInRecord,
+  LinkedInArticlesRecord,
+  LinkedInSchedule
 } from "@/lib/types";
 
 const DATA_ROOT = path.join(process.cwd(), "data", "runs");
+const LINKEDIN_ROOT = path.join(process.cwd(), "data", "linkedin");
 const SCHEMA_VERSION = "1" as const;
+
+type LinkedInOAuthState = {
+  state: string;
+  runId: string;
+  articleSlug: string;
+  createdAt: string;
+  expiresAt: string;
+  redirectUri: string;
+};
 
 type RunManifest = {
   runId: string;
@@ -55,6 +79,7 @@ type RunManifest = {
     topics: boolean;
     approvedTopic: boolean;
     blog: boolean;
+    linkedin: boolean;
   };
 };
 
@@ -166,6 +191,8 @@ export type RunApprovedArticlesRecord = {
   articles: ApprovedArticle[];
 };
 
+export type RunLinkedInArticlesRecord = LinkedInArticlesRecord;
+
 export type RunRegenerationNotesRecord = {
   runId: string;
   schemaVersion: typeof SCHEMA_VERSION;
@@ -190,6 +217,7 @@ export type RunBundle = {
   approvals: RunApprovalsRecord | null;
   approvedArticles: RunApprovedArticlesRecord | null;
   regenerationNotes: RunRegenerationNotesRecord | null;
+  linkedin: RunLinkedInArticlesRecord | null;
 };
 
 function runDir(runId: string) {
@@ -220,6 +248,24 @@ async function readJson<T>(runId: string, fileName: string): Promise<T | null> {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+async function ensureLinkedInDir() {
+  await mkdir(LINKEDIN_ROOT, { recursive: true });
+}
+
+async function writeLinkedInJson(fileName: string, value: unknown) {
+  await ensureLinkedInDir();
+  await writeFile(path.join(LINKEDIN_ROOT, fileName), JSON.stringify(value, null, 2), "utf8");
+}
+
+async function readLinkedInJson<T>(fileName: string): Promise<T | null> {
+  try {
+    const content = await readFile(path.join(LINKEDIN_ROOT, fileName), "utf8");
+    return JSON.parse(content) as T;
+  } catch {
+    return null;
+  }
 }
 
 function countWords(markdown: string) {
@@ -311,7 +357,8 @@ export async function createRun(input: WorkflowInput, model: string) {
       analysis: false,
       topics: false,
       approvedTopic: false,
-      blog: false
+      blog: false,
+      linkedin: false
     }
   };
 
@@ -571,6 +618,115 @@ export async function saveApprovedArticle(
   return upsertApprovedArticle(runId, article);
 }
 
+async function upsertLinkedInArticlesRecord(
+  runId: string,
+  articleSlug: string,
+  patch: Partial<LinkedInRecord>
+) {
+  const current = (await readJson<RunLinkedInArticlesRecord>(runId, "linkedin.json")) ?? {
+    runId,
+    schemaVersion: SCHEMA_VERSION,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+    articles: []
+  };
+
+  const existingArticle =
+    current.articles.find((entry) => entry.articleSlug === articleSlug) ??
+    ({
+      articleSlug,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+      draft: null,
+      connection: null,
+      approvals: [],
+      schedule: null,
+      publication: null
+    } satisfies LinkedInRecord);
+
+  const nextArticle: LinkedInRecord = linkedInRecordSchema.parse({
+    articleSlug,
+    createdAt: existingArticle.createdAt,
+    updatedAt: nowIso(),
+    draft: patch.draft ?? existingArticle.draft,
+    connection: patch.connection ?? existingArticle.connection,
+    approvals: patch.approvals ?? existingArticle.approvals,
+    schedule: patch.schedule ?? existingArticle.schedule,
+    publication: patch.publication ?? existingArticle.publication
+  });
+
+  const record: RunLinkedInArticlesRecord = linkedInArticlesRecordSchema.parse({
+    runId,
+    schemaVersion: SCHEMA_VERSION,
+    createdAt: current.createdAt,
+    updatedAt: nowIso(),
+    articles: [...current.articles.filter((entry) => entry.articleSlug !== articleSlug), nextArticle]
+  });
+
+  await writeJson(runId, "linkedin.json", record);
+  return record;
+}
+
+export async function saveLinkedInDraft(runId: string, draft: LinkedInDraft) {
+  return upsertLinkedInArticlesRecord(runId, draft.articleSlug, { draft });
+}
+
+export async function saveLinkedInConnection(runId: string, articleSlug: string, connection: LinkedInConnection) {
+  return upsertLinkedInArticlesRecord(runId, articleSlug, {
+    connection: linkedInConnectionSchema.parse(connection)
+  });
+}
+
+export async function saveLinkedInApproval(runId: string, articleSlug: string, approval: LinkedInApproval) {
+  const current = await readJson<RunLinkedInArticlesRecord>(runId, "linkedin.json");
+  const existing = current?.articles.find((entry) => entry.articleSlug === articleSlug);
+  const approvals = [
+    ...(existing?.approvals ?? []).filter((entry) => entry.approvalId !== approval.approvalId),
+    linkedInApprovalSchema.parse(approval)
+  ];
+
+  return upsertLinkedInArticlesRecord(runId, articleSlug, {
+    approvals,
+    draft: existing?.draft
+      ? {
+          ...existing.draft,
+          reviewStatus: approval.approved ? "approved" : "needs_revision",
+          publishStatus: approval.approved ? "ready" : existing.draft.publishStatus
+        }
+      : null
+  });
+}
+
+export async function saveLinkedInSchedule(runId: string, articleSlug: string, schedule: LinkedInSchedule) {
+  const current = await readJson<RunLinkedInArticlesRecord>(runId, "linkedin.json");
+  const existing = current?.articles.find((entry) => entry.articleSlug === articleSlug);
+
+  return upsertLinkedInArticlesRecord(runId, articleSlug, {
+    schedule: linkedInScheduleSchema.parse(schedule),
+    draft: existing?.draft
+      ? {
+          ...existing.draft,
+          publishStatus: "scheduled"
+        }
+      : null
+  });
+}
+
+export async function saveLinkedInPublication(runId: string, articleSlug: string, publication: LinkedInPublication) {
+  const current = await readJson<RunLinkedInArticlesRecord>(runId, "linkedin.json");
+  const existing = current?.articles.find((entry) => entry.articleSlug === articleSlug);
+
+  return upsertLinkedInArticlesRecord(runId, articleSlug, {
+    publication: linkedInPublicationSchema.parse(publication),
+    draft: existing?.draft
+      ? {
+          ...existing.draft,
+          publishStatus: publication.status === "published" ? "published" : existing.draft.publishStatus
+        }
+      : null
+  });
+}
+
 export async function updateManifest(
   runId: string,
   patch: Partial<Omit<RunManifest, "runId" | "schemaVersion" | "createdAt" | "steps">> & {
@@ -598,6 +754,7 @@ export async function updateManifest(
       topics: current?.steps.topics ?? false,
       approvedTopic: current?.steps.approvedTopic ?? false,
       blog: current?.steps.blog ?? false,
+      linkedin: current?.steps.linkedin ?? false,
       ...patch.steps
     }
   };
@@ -623,6 +780,7 @@ export async function loadRun(runId: string): Promise<RunBundle> {
   const approvals = await readJson<RunApprovalsRecord>(runId, "approvals.json");
   const approvedArticlesRaw = await readJson<RunApprovedArticlesRecord>(runId, "approved-articles.json");
   const regenerationNotes = await readJson<RunRegenerationNotesRecord>(runId, "regeneration-notes.json");
+  const linkedin = await readJson<RunLinkedInArticlesRecord>(runId, "linkedin.json");
 
   return {
     manifest,
@@ -639,8 +797,38 @@ export async function loadRun(runId: string): Promise<RunBundle> {
     revisions,
     approvals,
     approvedArticles: approvedArticlesRaw ? approvedArticlesSchema.parse(approvedArticlesRaw) : null,
-    regenerationNotes
+    regenerationNotes,
+    linkedin: linkedin ? linkedInArticlesRecordSchema.parse(linkedin) : null
   };
+}
+
+export async function saveLinkedInOAuthState(state: LinkedInOAuthState) {
+  const current = (await readLinkedInJson<{ states: LinkedInOAuthState[] }>("oauth-states.json")) ?? {
+    states: []
+  };
+
+  const record = {
+    states: [...current.states.filter((entry) => entry.state !== state.state), state]
+  };
+
+  await writeLinkedInJson("oauth-states.json", record);
+  return record;
+}
+
+export async function loadLinkedInOAuthState(state: string) {
+  const current = await readLinkedInJson<{ states: LinkedInOAuthState[] }>("oauth-states.json");
+  return current?.states.find((entry) => entry.state === state) ?? null;
+}
+
+export async function deleteLinkedInOAuthState(state: string) {
+  const current = await readLinkedInJson<{ states: LinkedInOAuthState[] }>("oauth-states.json");
+  if (!current) {
+    return null;
+  }
+
+  const next = { states: current.states.filter((entry) => entry.state !== state) };
+  await writeLinkedInJson("oauth-states.json", next);
+  return next;
 }
 
 export async function listRunSummaries(): Promise<RunSummary[]> {

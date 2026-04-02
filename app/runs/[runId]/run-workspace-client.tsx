@@ -380,20 +380,35 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
                     <h3 className="text-lg font-semibold text-neutral-900">{article.blog.title}</h3>
                     <p className="mt-1 text-sm leading-6 text-neutral-600">{article.blog.summary}</p>
                   </div>
-                  <a
-                    className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/25"
-                    href={`/runs/${runId}/blog/${article.articleSlug}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Open
-                  </a>
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/25"
+                      href={`/runs/${runId}/blog/${article.articleSlug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open
+                    </a>
+                    <a
+                      className="inline-flex items-center justify-center rounded-full border border-[#8b5cf6]/20 bg-[#f5f3ff] px-4 py-2 text-sm font-medium text-[#6d28d9] transition hover:-translate-y-0.5 hover:bg-[#ede9fe] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/25"
+                      href={`/runs/${runId}/blog/${article.articleSlug}/linkedin`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      LinkedIn
+                    </a>
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2 text-sm text-neutral-600">
                   <span>Topic: {article.topic.title}</span>
                   <span>Quality: {article.quality.score}%</span>
                   <span>Status: {article.approvalStatus}</span>
                   <span>Feedback: {article.feedbackCount}</span>
+                  <span>
+                    LinkedIn:{" "}
+                    {run.linkedin?.articles.find((item) => item.articleSlug === article.articleSlug)?.draft?.reviewStatus ??
+                      "pending"}
+                  </span>
                 </div>
               </article>
             ))}

@@ -65,6 +65,26 @@ const generatedBlogSchema = z.object({
   markdown: z.string()
 });
 
+const linkedInDraftSchema = z.object({
+  articleSlug: z.string(),
+  headline: z.string(),
+  caption: z.string(),
+  carouselPrompts: z
+    .array(
+      z.object({
+        slideNumber: z.number(),
+        title: z.string(),
+        prompt: z.string(),
+        designNotes: z.string()
+      })
+    )
+    .length(4),
+  hashtags: z.array(z.string()).min(3).max(10),
+  callToAction: z.string(),
+  publishStatus: z.enum(["draft", "ready", "scheduled", "published", "failed"]),
+  reviewStatus: z.enum(["draft", "pending_review", "approved", "needs_revision"])
+});
+
 const blogQualitySchema = z.object({
   score: z.number().min(0).max(100),
   publishStatus: z.enum(["publish_ready", "needs_review"]),
@@ -243,6 +263,36 @@ export async function rewriteBlogDraft(prompt: string) {
 
   if (!parsed) {
     throw new Error("Failed to parse rewritten blog.");
+  }
+
+  return parsed;
+}
+
+export async function generateLinkedInDraft(prompt: string) {
+  const client = getClient();
+  const response = await client.responses.parse({
+    model: defaultModel,
+    reasoning: { effort: "medium" },
+    input: [
+      {
+        role: "developer",
+        content:
+          "You create LinkedIn publishing packs from approved articles. Produce carousel prompts that are concise, practical, and visually consistent."
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    text: {
+      format: zodTextFormat(linkedInDraftSchema, "linkedin_draft")
+    }
+  });
+
+  const parsed = response.output_parsed;
+
+  if (!parsed) {
+    throw new Error("Failed to parse LinkedIn draft.");
   }
 
   return parsed;

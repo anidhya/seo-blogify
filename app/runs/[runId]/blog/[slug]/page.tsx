@@ -45,10 +45,10 @@ export default async function BlogPreviewPage({ params }: PageProps) {
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="grid gap-4 rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
-            <div className="flex items-start justify-between gap-4 max-md:flex-col">
-              <div>
-                <h2 className="text-lg font-semibold text-neutral-900">Article status</h2>
+            <div className="grid gap-4 rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
+              <div className="flex items-start justify-between gap-4 max-md:flex-col">
+                <div>
+                  <h2 className="text-lg font-semibold text-neutral-900">Article status</h2>
                 <div className="mt-3 grid gap-1 text-sm text-neutral-600">
                   <p>Publish status: {quality?.publishStatus ?? "draft"}</p>
                   <p>Quality score: {quality?.score ?? "n/a"}</p>
@@ -57,10 +57,18 @@ export default async function BlogPreviewPage({ params }: PageProps) {
                   <p>Workflow status: {manifest?.status ?? "unknown"}</p>
                   <p>Approval state: {latestApproval ? latestApproval.publishStatus : "pending"}</p>
                 </div>
+                </div>
               </div>
+              <BlogActions runId={runId} slug={slug} canApprove={canApprove} />
+              {latestApproval?.approved ? (
+                <a
+                  className="inline-flex w-fit items-center justify-center rounded-full border border-[#8b5cf6]/20 bg-[#f5f3ff] px-4 py-2 text-sm font-medium text-[#6d28d9] transition hover:-translate-y-0.5 hover:bg-[#ede9fe] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/25"
+                  href={`/runs/${runId}/blog/${slug}/linkedin`}
+                >
+                  Open LinkedIn workflow
+                </a>
+              ) : null}
             </div>
-            <BlogActions runId={runId} slug={slug} canApprove={canApprove} />
-          </div>
 
           <div className="grid gap-4">
             <div className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">

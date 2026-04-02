@@ -11,6 +11,12 @@ type Props = {
   canApprove: boolean;
 };
 
+type WorkflowResponse = {
+  runId?: string;
+  linkedinUrl?: string | null;
+  error?: string;
+};
+
 async function postWorkflow(payload: Record<string, unknown>) {
   const response = await fetch("/api/workflow", {
     method: "POST",
@@ -20,7 +26,7 @@ async function postWorkflow(payload: Record<string, unknown>) {
     body: JSON.stringify(payload)
   });
 
-  const data = (await response.json()) as { error?: string };
+  const data = (await response.json()) as WorkflowResponse;
 
   if (!response.ok || data.error) {
     throw new Error(data.error || "Workflow request failed.");
@@ -101,15 +107,19 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
       try {
         setError(null);
         setActiveAction("approve-blog");
-        await postWorkflow({
+        const data = (await postWorkflow({
           step: "approve-blog",
           runId,
           articleSlug: slug,
           approved,
           comments: approvalNotes.trim()
-        });
+        })) as WorkflowResponse;
         setApprovalNotes("");
-        router.refresh();
+        if (approved) {
+          router.push((data.linkedinUrl || `/runs/${runId}/blog/${slug}/linkedin`) as never);
+        } else {
+          router.refresh();
+        }
       } catch (caughtError) {
         const message = caughtError instanceof Error ? caughtError.message : "Unknown error";
         setError(message);
