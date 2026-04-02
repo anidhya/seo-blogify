@@ -90,6 +90,7 @@ export type BlogQuality = {
 
 export type BlogRevision = {
   revisionId: string;
+  articleSlug: string;
   createdAt: string;
   comments: string;
   blog: GeneratedBlog;
@@ -98,6 +99,7 @@ export type BlogRevision = {
 
 export type RegenerationNote = {
   revisionId: string;
+  articleSlug: string;
   createdAt: string;
   comments: string;
   priorScore: number | null;
@@ -107,11 +109,25 @@ export type RegenerationNote = {
 
 export type BlogApproval = {
   approvalId: string;
+  articleSlug: string;
   createdAt: string;
   approved: boolean;
   notes: string;
   score: number | null;
   publishStatus: "approved" | "needs_review";
+};
+
+export type ApprovedArticle = {
+  articleId: string;
+  articleSlug: string;
+  createdAt: string;
+  updatedAt: string;
+  topic: TopicSuggestion;
+  blog: GeneratedBlog;
+  quality: BlogQuality;
+  wordCount: number;
+  approvalStatus: "pending" | "approved" | "needs_revision";
+  feedbackCount: number;
 };
 
 export type WorkflowProgress = {

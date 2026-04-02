@@ -331,7 +331,7 @@ export default function HomePage() {
           </div>
 
           {analyzeProgress ? (
-            <WorkflowProgressBar progress={analyzeProgress} className="mt-4" label="Analyzing" />
+            <WorkflowProgressBar progress={analyzeProgress} label="Analyzing" variant="top" />
           ) : null}
 
           <div

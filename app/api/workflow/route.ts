@@ -10,8 +10,10 @@ import {
 } from "@/lib/openai";
 import {
   deriveExistingTopics,
+  deriveExistingTopicsFromUrls,
   formatExistingTopicsForPrompt,
   formatRejectedTopicsForPrompt,
+  mergeExistingTopics,
   validateTopicCandidates
 } from "@/lib/topic-dedup";
 import type { BlogQuality, BrandAnalysis, TopicSuggestion, WorkflowInput, WorkflowStep } from "@/lib/types";
@@ -19,6 +21,7 @@ import { NextResponse } from "next/server";
 import {
   createRun,
   loadRun,
+  saveApprovedArticle,
   saveExistingTopics,
   saveApprovedTopic,
   saveApproval,
@@ -37,6 +40,7 @@ import {
 type RequestBody = {
   step: WorkflowStep;
   runId?: string;
+  articleSlug?: string;
   comments?: string;
   approved?: boolean;
   markdown?: string;
@@ -46,7 +50,12 @@ type RequestBody = {
   };
 };
 
-function formatResearchBlock(input: WorkflowInput, homepageText: string, blogText: string) {
+function formatResearchBlock(
+  input: WorkflowInput,
+  homepageText: string,
+  blogText: string,
+  sitemapUrls: string[] = []
+) {
   return [
     `Company name hint: ${input.companyName || "Not provided"}`,
     `Vision hint: ${input.vision || "Not provided"}`,
@@ -56,8 +65,16 @@ function formatResearchBlock(input: WorkflowInput, homepageText: string, blogTex
     homepageText,
     "",
     "Blog research:",
-    blogText
+    blogText,
+    "",
+    formatSitemapBlock(sitemapUrls)
   ].join("\n");
+}
+
+function formatSitemapBlock(urls: string[]) {
+  return urls.length > 0
+    ? `Sitemap URLs:\n${urls.map((url, index) => `${index + 1}. ${url}`).join("\n")}`
+    : "Sitemap URLs: None discovered.";
 }
 
 function formatInternalLinkHints(run: Awaited<ReturnType<typeof loadRun>>) {
@@ -125,6 +142,7 @@ function formatBlogStructurePrompt(params: {
   input: WorkflowInput;
   homepageText: string;
   blogText: string;
+  sitemapUrls: string[];
   internalLinkHints: string;
 }) {
   return [
@@ -146,7 +164,7 @@ function formatBlogStructurePrompt(params: {
     "",
     `Existing site content and link targets:\n${params.internalLinkHints}`,
     "",
-    formatResearchBlock(params.input, params.homepageText, params.blogText)
+    formatResearchBlock(params.input, params.homepageText, params.blogText, params.sitemapUrls)
   ].join("\n");
 }
 
@@ -180,6 +198,7 @@ async function scoreAndPersistBlog(params: {
   run: Awaited<ReturnType<typeof loadRun>>;
   blog: Awaited<ReturnType<typeof generateApprovedBlog>>;
   topic: TopicSuggestion;
+  articleSlug: string;
   rewriteAttempts: number;
   comments?: string;
 }): Promise<{
@@ -198,7 +217,7 @@ async function scoreAndPersistBlog(params: {
     })
   );
 
-  await saveBlog(params.runId, params.blog);
+  const savedBlog = await saveBlog(params.runId, params.blog);
   const qualityPayload: BlogQuality = {
     score: quality.score,
     publishStatus: quality.score >= 80 ? "publish_ready" : "needs_review",
@@ -208,9 +227,19 @@ async function scoreAndPersistBlog(params: {
     notes: quality.notes
   };
   await saveQuality(params.runId, qualityPayload);
+  await saveApprovedArticle(params.runId, {
+    articleSlug: params.articleSlug,
+    topic: params.topic,
+    blog: params.blog,
+    quality: qualityPayload,
+    wordCount: savedBlog.wordCount,
+    approvalStatus: quality.score >= 80 ? "pending" : "needs_revision",
+    feedbackCount: params.comments ? 1 : 0
+  });
 
   if (params.comments) {
     await saveBlogRevision(params.runId, {
+      articleSlug: params.articleSlug,
       comments: params.comments,
       blog: params.blog,
       quality: qualityPayload
@@ -230,7 +259,11 @@ async function generateValidatedTopicSet(run: Awaited<ReturnType<typeof loadRun>
     throw new Error("Saved run data is incomplete.");
   }
 
-  const existingTopics = run.existingTopics?.existingTopics ?? deriveExistingTopics(run.research.homepage, run.research.blogs);
+  const existingTopics = mergeExistingTopics(
+    run.existingTopics?.existingTopics ?? [],
+    deriveExistingTopics(run.research.homepage, run.research.blogs),
+    deriveExistingTopicsFromUrls(run.research.sitemapUrls ?? [])
+  );
   const acceptedTopics: TopicSuggestion[] = [];
   const rejectedTopics: Array<{
     topic: TopicSuggestion;
@@ -259,6 +292,7 @@ async function generateValidatedTopicSet(run: Awaited<ReturnType<typeof loadRun>
       "Do not rewrite existing articles with only new wording.",
       "Each topic must target a distinct intent, keyword cluster, or content angle.",
       "Avoid topics that are semantically similar to any existing article or any previously accepted topic in this run.",
+      "Treat sitemap URLs as existing content coverage even when no page snapshot is available.",
       "Return only new topics.",
       "",
       `Existing coverage:\n${coverageBlock}`,
@@ -315,8 +349,11 @@ export async function POST(request: Request) {
       const research = await collectResearch(payload.websiteUrl, payload.blogUrls);
       await setProgress(runId, "analyze", 25, "Building the research snapshot");
       const researchRecord = await saveResearch(runId, research);
-      await setProgress(runId, "analyze", 40, "Deriving existing blog coverage");
-      const existingTopics = deriveExistingTopics(research.homepage, research.blogs);
+      await setProgress(runId, "analyze", 40, "Reading sitemap.xml and expanding coverage");
+      const existingTopics = mergeExistingTopics(
+        deriveExistingTopics(research.homepage, research.blogs),
+        deriveExistingTopicsFromUrls(research.sitemapUrls ?? [])
+      );
       await saveExistingTopics(runId, existingTopics);
       await updateManifest(runId, { status: "created", steps: { research: true } });
       await setProgress(runId, "analyze", 55, "Analyzing brand voice and audience");
@@ -333,9 +370,10 @@ export async function POST(request: Request) {
         "Analyze the company's brand, products, vision, target audience, and blog writing style.",
         "Infer voice and style from the homepage and blogs.",
         "Highlight SEO opportunities and content gaps.",
+        "Consider sitemap coverage as part of the site's existing content inventory.",
         "Respond using the provided JSON schema.",
         "",
-        formatResearchBlock(payload, homepageText, blogText)
+    formatResearchBlock(payload, homepageText, blogText, research.sitemapUrls ?? [])
       ].join("\n");
 
       const analysis = await generateStructuredAnalysis(analysisPrompt);
@@ -404,6 +442,7 @@ export async function POST(request: Request) {
         input: run.input,
         homepageText,
         blogText,
+        sitemapUrls: run.research.sitemapUrls ?? [],
         internalLinkHints: formatInternalLinkHints(run)
       });
 
@@ -446,6 +485,7 @@ export async function POST(request: Request) {
         run,
         blog,
         topic: payload.selectedTopic,
+        articleSlug: blog.slug,
         rewriteAttempts: attempts
       });
       await setProgress(runId, "generate-blog", 100, "Blog ready", true);
@@ -482,6 +522,7 @@ export async function POST(request: Request) {
         run,
         blog: updatedBlog,
         topic: run.approvedTopic.approvedTopic,
+        articleSlug: body.articleSlug ?? updatedBlog.slug,
         rewriteAttempts: run.quality?.quality.rewriteAttempts ?? 0,
         comments: body.comments?.trim() || "Manual edit via preview editor"
       });
@@ -523,6 +564,7 @@ export async function POST(request: Request) {
       const revisionId = `rev-${Date.now()}`;
 
       await saveBlogRevision(runId, {
+        articleSlug: body.articleSlug ?? run.blog.blog.slug,
         comments: `Previous version before regeneration: ${comments}`,
         blog: run.blog.blog,
         quality: run.quality?.quality ?? {
@@ -562,11 +604,12 @@ export async function POST(request: Request) {
         formatBlogStructurePrompt({
           topic: run.approvedTopic.approvedTopic,
           analysis: run.analysis.analysis,
-          input: run.input,
-          homepageText,
-          blogText,
-          internalLinkHints: formatInternalLinkHints(run)
-        })
+        input: run.input,
+        homepageText,
+        blogText,
+        sitemapUrls: run.research.sitemapUrls ?? [],
+        internalLinkHints: formatInternalLinkHints(run)
+      })
       ].join("\n");
 
       await setProgress(runId, "regenerate-blog", 35, "Regenerating blog draft");
@@ -608,6 +651,7 @@ export async function POST(request: Request) {
         run,
         blog,
         topic: run.approvedTopic.approvedTopic,
+        articleSlug: run.blog.blog.slug,
         rewriteAttempts: attempts,
         comments
       });
@@ -615,6 +659,7 @@ export async function POST(request: Request) {
 
       await saveRegenerationNote(runId, {
         revisionId,
+        articleSlug: body.articleSlug ?? run.blog.blog.slug,
         createdAt: new Date().toISOString(),
         comments,
         priorScore,
@@ -646,6 +691,7 @@ export async function POST(request: Request) {
       const approved = Boolean(body.approved);
       const notes = body.comments?.trim() ?? "";
       const score = run.quality?.quality.score ?? null;
+      const articleSlug = body.articleSlug ?? run.blog.blog.slug;
 
       if (approved && (score === null || score < 80)) {
         return NextResponse.json(
@@ -657,10 +703,42 @@ export async function POST(request: Request) {
       await setProgress(runId, "approve-blog", 25, "Recording approval decision");
       const publishStatus = approved ? "approved" : "needs_review";
       await saveApproval(runId, {
+        articleSlug,
         approved,
         notes,
         score,
         publishStatus
+      });
+      await saveApprovedArticle(runId, {
+        articleSlug,
+        topic: run.approvedTopic?.approvedTopic ?? {
+          title: run.blog.blog.title,
+          primaryKeyword: run.blog.blog.meta.keywords[0] ?? run.blog.blog.title,
+          searchIntent: "Approval flow",
+          rankingRationale: "Approved article from the current run.",
+          seoAngle: "Article review",
+          outline: []
+        },
+        blog: run.blog.blog,
+        quality: run.quality?.quality ?? {
+          score: score ?? 0,
+          publishStatus: approved ? "publish_ready" : "needs_review",
+          evaluation: {
+            sentenceVariety: 0,
+            specificity: 0,
+            naturalTransitions: 0,
+            reducedRepetition: 0,
+            concreteExamples: 0,
+            absenceOfAIFluff: 0,
+            brandConsistency: 0
+          },
+          issues: [],
+          rewriteAttempts: 0,
+          notes: []
+        },
+        wordCount: run.blog.wordCount,
+        approvalStatus: approved ? "approved" : "needs_revision",
+        feedbackCount: run.revisions?.revisions.filter((revision) => revision.articleSlug === articleSlug).length ?? 0
       });
       await updateManifest(runId, {
         status: approved ? "approved" : "needs_review",

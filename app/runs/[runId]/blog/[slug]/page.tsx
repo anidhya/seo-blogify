@@ -17,16 +17,18 @@ export default async function BlogPreviewPage({ params }: PageProps) {
   const { runId, slug } = await params;
   const run = await loadRun(runId);
 
-  if (!run.blog?.blog || run.blog.blog.slug !== slug) {
+  const approvedArticle = run.approvedArticles?.articles.find((article) => article.articleSlug === slug) ?? null;
+  const blog = approvedArticle?.blog ?? (run.blog?.blog?.slug === slug ? run.blog.blog : null);
+
+  if (!blog) {
     notFound();
   }
 
-  const blog = run.blog.blog;
-  const quality = run.quality?.quality;
+  const quality = approvedArticle?.quality ?? run.quality?.quality;
   const manifest = run.manifest;
-  const notes = run.regenerationNotes?.notes ?? [];
-  const revisions = run.revisions?.revisions ?? [];
-  const approvals = run.approvals?.approvals ?? [];
+  const notes = (run.regenerationNotes?.notes ?? []).filter((note) => note.articleSlug === slug);
+  const revisions = (run.revisions?.revisions ?? []).filter((revision) => revision.articleSlug === slug);
+  const approvals = (run.approvals?.approvals ?? []).filter((approval) => approval.articleSlug === slug);
   const canApprove = quality?.publishStatus === "publish_ready";
   const latestApproval = approvals[approvals.length - 1];
 
@@ -50,7 +52,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
                 <div className="mt-3 grid gap-1 text-sm text-neutral-600">
                   <p>Publish status: {quality?.publishStatus ?? "draft"}</p>
                   <p>Quality score: {quality?.score ?? "n/a"}</p>
-                  <p>Word count: {run.blog.wordCount}</p>
+                  <p>Word count: {approvedArticle?.wordCount ?? run.blog?.wordCount ?? "n/a"}</p>
                   <p>Run ID: {runId}</p>
                   <p>Workflow status: {manifest?.status ?? "unknown"}</p>
                   <p>Approval state: {latestApproval ? latestApproval.publishStatus : "pending"}</p>
@@ -240,7 +242,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
           </div>
         </div>
 
-        <EditableArticleCard runId={runId} markdown={blog.markdown} />
+        <EditableArticleCard runId={runId} articleSlug={slug} markdown={blog.markdown} />
 
         <article className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
           <div className="flex items-start justify-between gap-4 max-md:flex-col">

@@ -47,6 +47,7 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
   const [blog, setBlog] = useState(run.blog?.blog ?? null);
   const [wordCount, setWordCount] = useState(run.blog?.wordCount ?? null);
   const [quality, setQuality] = useState(run.quality?.quality ?? null);
+  const [approvedArticles, setApprovedArticles] = useState(run.approvedArticles?.articles ?? []);
   const [status, setStatus] = useState<string>(run.manifest?.status ?? "created");
   const [error, setError] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<"suggest-topics" | "generate-blog" | null>(null);
@@ -55,6 +56,8 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
   const analysis = run.analysis?.analysis ?? null;
   const input = run.input ?? null;
   const workflowProgress = useWorkflowProgress({ runId, enabled: Boolean(activeAction) });
+  const blogSources = run.research?.blogs ?? [];
+  const sitemapUrls = run.research?.sitemapUrls ?? [];
   const visibleProgress =
     activeAction && workflowProgress
       ? workflowProgress
@@ -124,6 +127,22 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
           setBlog(data.blog);
           setWordCount(data.wordCount);
           setQuality(data.quality);
+          setApprovedArticles((current) => {
+            const nextArticle = {
+              articleId: data.blog.slug,
+              articleSlug: data.blog.slug,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              topic,
+              blog: data.blog,
+              quality: data.quality,
+              wordCount: data.wordCount,
+              approvalStatus: data.quality.publishStatus === "publish_ready" ? "pending" : "needs_revision",
+              feedbackCount: 0
+            } as const;
+
+            return [...current.filter((article) => article.articleSlug !== data.blog.slug), nextArticle];
+          });
           setStatus("Blog draft generated.");
         }
       } catch (caughtError) {
@@ -160,35 +179,68 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
         </div>
       </div>
 
+      {visibleProgress ? (
+        <WorkflowProgressBar
+          progress={visibleProgress}
+          label={visibleProgress.action === "suggest-topics" ? "Topic generation" : "Blog generation"}
+          variant="top"
+        />
+      ) : null}
+
       {analysis ? (
-        <section className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-900">Analysis so far</h2>
-            <p className="text-sm text-neutral-600">Brand summary, audience, voice, and SEO notes from the sync.</p>
+        <section className="rounded-[2rem] border border-black/10 bg-gradient-to-br from-[#fff4ea] via-[#fffaf4] to-[#eef7ff] p-6 shadow-[0_24px_80px_rgba(70,96,132,0.14)] backdrop-blur">
+          <div className="flex items-start justify-between gap-4 max-md:flex-col">
+            <div>
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/60 bg-white/70 px-4 py-2 text-sm text-neutral-700 shadow-sm">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#3b82f6]" />
+                Brand Analysis
+              </div>
+              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-neutral-950">Analysis so far</h2>
+              <p className="text-sm text-neutral-600">Brand summary, audience, voice, SEO notes, & source coverage from the sync.</p>
+            </div>
+            <div className="grid gap-2 rounded-3xl border border-white/70 bg-white/70 p-4 shadow-sm">
+              <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Site Sources</p>
+              <p className="text-sm text-neutral-700">
+                Website: <span className="font-medium text-neutral-950">{input?.websiteUrl ?? "n/a"}</span>
+              </p>
+              <p className="text-sm text-neutral-700">
+                Blog URLs: <span className="font-medium text-neutral-950">{blogSources.length}</span>
+              </p>
+              <p className="text-sm text-neutral-700">
+                Sitemap URLs: <span className="font-medium text-neutral-950">{sitemapUrls.length}</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">Audience</span>
+            <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">Voice</span>
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">SEO</span>
+            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Coverage</span>
           </div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <div className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
-              <h3 className="text-base font-semibold text-neutral-900">Audience</h3>
-              <p className="mt-2 text-sm leading-6 text-neutral-600">{analysis.audience}</p>
+            <div className="rounded-[1.5rem] border border-sky-200/70 bg-sky-50/90 p-4 shadow-[0_14px_40px_rgba(56,189,248,0.08)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-600">Audience</p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">{analysis.audience}</p>
             </div>
-            <div className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
-              <h3 className="text-base font-semibold text-neutral-900">Reading level</h3>
-              <p className="mt-2 text-sm leading-6 text-neutral-600">{analysis.writingStyle.readingLevel}</p>
+            <div className="rounded-[1.5rem] border border-violet-200/70 bg-violet-50/90 p-4 shadow-[0_14px_40px_rgba(139,92,246,0.08)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-600">Reading Level</p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">{analysis.writingStyle.readingLevel}</p>
             </div>
-            <div className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
-              <h3 className="text-base font-semibold text-neutral-900">Company Summary</h3>
-              <p className="mt-2 text-sm leading-6 text-neutral-600">{analysis.companySummary}</p>
+            <div className="rounded-[1.5rem] border border-amber-200/70 bg-amber-50/90 p-4 shadow-[0_14px_40px_rgba(245,158,11,0.08)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-600">Company Summary</p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">{analysis.companySummary}</p>
             </div>
-            <div className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
-              <h3 className="text-base font-semibold text-neutral-900">Vision</h3>
-              <p className="mt-2 text-sm leading-6 text-neutral-600">{analysis.vision}</p>
+            <div className="rounded-[1.5rem] border border-emerald-200/70 bg-emerald-50/90 p-4 shadow-[0_14px_40px_rgba(16,185,129,0.08)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">Vision</p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">{analysis.vision}</p>
             </div>
           </div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <div className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
-              <h3 className="text-base font-semibold text-neutral-900">Brand Voice</h3>
+            <div className="rounded-[1.5rem] border border-neutral-200/70 bg-white/80 p-4 shadow-sm">
+              <h3 className="text-base font-semibold text-neutral-950">Brand Voice</h3>
               <div className="mt-3 flex flex-wrap gap-2">
                 {analysis.brandVoice.map((voice) => (
                   <span className="rounded-full bg-[#f2d1c3] px-3 py-1 text-xs font-medium text-[#7e3614]" key={voice}>
@@ -197,11 +249,11 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
                 ))}
               </div>
             </div>
-            <div className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
-              <h3 className="text-base font-semibold text-neutral-900">SEO Observations</h3>
+            <div className="rounded-[1.5rem] border border-neutral-200/70 bg-white/80 p-4 shadow-sm">
+              <h3 className="text-base font-semibold text-neutral-950">SEO Observations</h3>
               <div className="mt-3 flex flex-wrap gap-2">
                 {analysis.seoObservations.map((item) => (
-                  <span className="rounded-full bg-[#f2d1c3] px-3 py-1 text-xs font-medium text-[#7e3614]" key={item}>
+                  <span className="rounded-full bg-[#dbeafe] px-3 py-1 text-xs font-medium text-[#1d4ed8]" key={item}>
                     {item}
                   </span>
                 ))}
@@ -218,18 +270,40 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
             <p className="text-sm text-neutral-600">Approve a topic to generate the draft. Generate a fresh queue if needed.</p>
           </div>
           <button
-            className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/25 disabled:cursor-progress disabled:opacity-60"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/80 text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/25 disabled:cursor-progress disabled:opacity-60"
             type="button"
             onClick={suggestTopics}
             disabled={isPending || activeAction === "suggest-topics"}
+            aria-label={topics.length ? "Refresh topics" : "Suggest 10 topics"}
+            title={topics.length ? "Refresh topics" : "Suggest 10 topics"}
           >
-            {activeAction === "suggest-topics" ? "Suggesting…" : topics.length ? "Refresh topics" : "Suggest 10 Topics"}
+            {activeAction === "suggest-topics" ? (
+              <svg aria-hidden="true" className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
+                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M4 12a8 8 0 0 1 13.657-5.657L20 8.686"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path d="M20 4v4h-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M20 12a8 8 0 0 1-13.657 5.657L4 15.314"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path d="M4 20v-4h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
           </button>
         </div>
-
-        {visibleProgress && activeAction === "suggest-topics" ? (
-          <WorkflowProgressBar progress={visibleProgress} label="Generating topics" className="mt-4" />
-        ) : null}
 
         {topics.length === 0 ? (
           <p className="mt-5 text-sm text-neutral-600">No topics have been generated for this run yet.</p>
@@ -265,6 +339,46 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
         )}
       </section>
 
+      <section className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
+        <div className="flex items-end justify-between gap-4 max-md:flex-col max-md:items-start">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-900">Approved Articles</h2>
+            <p className="text-sm text-neutral-600">Each article keeps its own feedback loop and regeneration history.</p>
+          </div>
+        </div>
+
+        {approvedArticles.length === 0 ? (
+          <p className="mt-5 text-sm text-neutral-600">No approved articles have been saved yet.</p>
+        ) : (
+          <div className="mt-5 grid gap-4 xl:grid-cols-2">
+            {approvedArticles.map((article) => (
+              <article key={article.articleSlug} className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
+                <div className="flex items-start justify-between gap-4 max-md:flex-col">
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-semibold text-neutral-900">{article.blog.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-neutral-600">{article.blog.summary}</p>
+                  </div>
+                  <a
+                    className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/25"
+                    href={`/runs/${runId}/blog/${article.articleSlug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open
+                  </a>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2 text-sm text-neutral-600">
+                  <span>Topic: {article.topic.title}</span>
+                  <span>Quality: {article.quality.score}%</span>
+                  <span>Status: {article.approvalStatus}</span>
+                  <span>Feedback: {article.feedbackCount}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
       {blog ? (
         <section className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
           <div className="flex items-center justify-between gap-4 max-md:flex-col max-md:items-start">
@@ -283,10 +397,6 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
               </a>
             ) : null}
           </div>
-
-          {visibleProgress && activeAction === "generate-blog" ? (
-            <WorkflowProgressBar progress={visibleProgress} label="Generating blog" className="mt-4" />
-          ) : null}
 
           <div className="mt-5 rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
             <h3 className="text-lg font-semibold text-neutral-900">{blog.title}</h3>

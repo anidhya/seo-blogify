@@ -8,10 +8,11 @@ import CopyButton from "./copy-button";
 
 type Props = {
   runId: string;
+  articleSlug: string;
   markdown: string;
 };
 
-async function updateBlog(runId: string, markdown: string) {
+async function updateBlog(runId: string, articleSlug: string, markdown: string) {
   const response = await fetch("/api/workflow", {
     method: "POST",
     headers: {
@@ -20,6 +21,7 @@ async function updateBlog(runId: string, markdown: string) {
     body: JSON.stringify({
       step: "update-blog",
       runId,
+      articleSlug,
       markdown
     })
   });
@@ -33,7 +35,7 @@ async function updateBlog(runId: string, markdown: string) {
   return data;
 }
 
-export default function EditableArticleCard({ runId, markdown }: Props) {
+export default function EditableArticleCard({ runId, articleSlug, markdown }: Props) {
   const router = useRouter();
   const [draft, setDraft] = useState(markdown);
   const [editing, setEditing] = useState(false);
@@ -80,7 +82,7 @@ export default function EditableArticleCard({ runId, markdown }: Props) {
       try {
         setStatus(null);
         setActiveAction("update-blog");
-        await updateBlog(runId, draft.trim());
+        await updateBlog(runId, articleSlug, draft.trim());
         setEditing(false);
         setStatus("Article updated.");
         router.refresh();
@@ -131,6 +133,10 @@ export default function EditableArticleCard({ runId, markdown }: Props) {
         </div>
       </div>
 
+      {visibleProgress ? (
+        <WorkflowProgressBar progress={visibleProgress} label="Saving edits" variant="top" />
+      ) : null}
+
       {editing ? (
         <textarea
           className="mt-4 min-h-[520px] w-full rounded-3xl border border-black/10 bg-white/90 px-4 py-3 text-sm leading-7 text-neutral-800 outline-none transition focus:border-[#c35d2e] focus:ring-2 focus:ring-[#c35d2e]/20"
@@ -141,10 +147,6 @@ export default function EditableArticleCard({ runId, markdown }: Props) {
         ) : (
           <div className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-neutral-700">{markdown}</div>
       )}
-
-      {visibleProgress && activeAction === "update-blog" ? (
-        <WorkflowProgressBar progress={visibleProgress} label="Saving article edits" className="mt-4" />
-      ) : null}
 
       {status ? <p className="mt-3 text-sm text-neutral-600">{status}</p> : null}
     </article>

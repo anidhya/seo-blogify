@@ -17,7 +17,9 @@ export const pageSnapshotSchema = z.object({
 
 export const researchSchema = z.object({
   homepage: pageSnapshotSchema,
-  blogs: z.array(pageSnapshotSchema)
+  blogs: z.array(pageSnapshotSchema),
+  sitemapUrls: z.array(z.string()).default([]),
+  sitemapBlogUrls: z.array(z.string()).default([])
 });
 
 export const existingTopicSchema = z.object({
@@ -90,6 +92,7 @@ export const blogQualitySchema = z.object({
 
 export const blogRevisionSchema = z.object({
   revisionId: z.string(),
+  articleSlug: z.string(),
   createdAt: z.string(),
   comments: z.string(),
   blog: z.lazy(() => generatedBlogSchema),
@@ -98,6 +101,7 @@ export const blogRevisionSchema = z.object({
 
 export const regenerationNoteSchema = z.object({
   revisionId: z.string(),
+  articleSlug: z.string(),
   createdAt: z.string(),
   comments: z.string(),
   priorScore: z.number().nullable(),
@@ -107,11 +111,33 @@ export const regenerationNoteSchema = z.object({
 
 export const blogApprovalSchema = z.object({
   approvalId: z.string(),
+  articleSlug: z.string(),
   createdAt: z.string(),
   approved: z.boolean(),
   notes: z.string(),
   score: z.number().nullable(),
   publishStatus: z.enum(["approved", "needs_review"])
+});
+
+export const approvedArticleSchema = z.object({
+  articleId: z.string(),
+  articleSlug: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  topic: topicSuggestionSchema,
+  blog: z.lazy(() => generatedBlogSchema),
+  quality: blogQualitySchema,
+  wordCount: z.number(),
+  approvalStatus: z.enum(["pending", "approved", "needs_revision"]),
+  feedbackCount: z.number()
+});
+
+export const approvedArticlesSchema = z.object({
+  runId: z.string(),
+  schemaVersion: z.literal("1"),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  articles: z.array(approvedArticleSchema)
 });
 
 export const workflowProgressSchema = z.object({

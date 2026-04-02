@@ -104,6 +104,61 @@ export function deriveExistingTopics(homepage: PageSnapshot, blogs: PageSnapshot
   });
 }
 
+function titleize(parts: string[]) {
+  return parts
+    .map((part) => part.replace(/[-_]+/g, " ").trim())
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+export function deriveExistingTopicsFromUrls(urls: string[]): ExistingTopic[] {
+  return urls
+    .map((sourceUrl) => {
+      try {
+        const parsed = new URL(sourceUrl);
+        const pathParts = parsed.pathname
+          .split("/")
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .filter((part) => !["blog", "blogs", "post", "posts", "article", "articles", "resources", "insights"].includes(part.toLowerCase()));
+        const slugParts = pathParts.length > 0 ? pathParts : parsed.hostname.split(".");
+        const title = titleize(slugParts.slice(-4));
+        const tokens = meaningfulTokens(title);
+        const primaryKeyword = tokens.slice(0, Math.min(tokens.length, 5)).join(" ") || parsed.pathname.replace(/\//g, " ").trim();
+        return {
+          sourceUrl,
+          sourceTitle: title || sourceUrl,
+          title: title || sourceUrl,
+          primaryKeyword,
+          summary: `Content discovered from sitemap URL ${parsed.pathname}`,
+          keywords: unique([...tokens, ...meaningfulTokens(parsed.pathname)]).slice(0, 8)
+        };
+      } catch {
+        return null;
+      }
+    })
+    .filter((topic): topic is ExistingTopic => Boolean(topic));
+}
+
+export function mergeExistingTopics(...groups: ExistingTopic[][]) {
+  const merged: ExistingTopic[] = [];
+  const seen = new Set<string>();
+
+  for (const group of groups) {
+    for (const topic of group) {
+      const key = `${normalize(topic.sourceUrl)}|${normalize(topic.title)}|${normalize(topic.primaryKeyword)}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      merged.push(topic);
+    }
+  }
+
+  return merged;
+}
+
 function scoreComparison(candidate: TopicSuggestion, existing: ExistingTopic) {
   const candidateTitleTokens = meaningfulTokens(candidate.title);
   const existingTitleTokens = meaningfulTokens(existing.title);

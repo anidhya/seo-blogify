@@ -1,6 +1,10 @@
 import type { PageSnapshot } from "@/lib/types";
 
 const USER_AGENT = "Mozilla/5.0 (compatible; BlogifyBot/1.0; +https://example.com)";
+const BLOG_PATH_HINTS = /\/(blog|blogs|posts?|articles?|resources?|insights?|guides?|news|updates?)\//i;
+const EXCLUDED_PATH_HINTS = /\/(tag|tags|category|categories|author|authors|page|pages|feed|rss|search)\//i;
+const MAX_SITEMAP_FILES = 10;
+const MAX_SITEMAP_URLS = 500;
 
 function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -33,7 +37,39 @@ function sliceContent(text: string, maxChars = 9000) {
   return `${text.slice(0, maxChars)}...`;
 }
 
-export async function fetchPageSnapshot(url: string): Promise<PageSnapshot> {
+function normalizeUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = "";
+    parsed.search = "";
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return url.trim();
+  }
+}
+
+function isLikelyBlogUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    if (EXCLUDED_PATH_HINTS.test(parsed.pathname)) {
+      return false;
+    }
+    if (parsed.pathname === "/" || parsed.pathname === "") {
+      return false;
+    }
+    return BLOG_PATH_HINTS.test(parsed.pathname) || parsed.pathname.split("/").filter(Boolean).length >= 2;
+  } catch {
+    return false;
+  }
+}
+
+function extractLocs(xml: string) {
+  return Array.from(xml.matchAll(/<loc>\s*([^<]+)\s*<\/loc>/gi))
+    .map((match) => match[1].trim())
+    .filter(Boolean);
+}
+
+async function fetchText(url: string) {
   const response = await fetch(url, {
     headers: {
       "User-Agent": USER_AGENT
@@ -45,7 +81,63 @@ export async function fetchPageSnapshot(url: string): Promise<PageSnapshot> {
     throw new Error(`Failed to fetch ${url}: ${response.status}`);
   }
 
-  const html = await response.text();
+  return response.text();
+}
+
+async function collectSitemapUrls(startUrl: string, visited = new Set<string>(), depth = 0): Promise<string[]> {
+  if (depth > 2 || visited.size >= MAX_SITEMAP_FILES) {
+    return [];
+  }
+
+  const sitemapUrl = new URL("/sitemap.xml", new URL(startUrl).origin).toString();
+  const candidates = [
+    sitemapUrl,
+    new URL("/sitemap_index.xml", new URL(startUrl).origin).toString()
+  ];
+
+  const urls: string[] = [];
+
+  for (const candidate of candidates) {
+    if (visited.has(candidate)) {
+      continue;
+    }
+
+    try {
+      visited.add(candidate);
+      const xml = await fetchText(candidate);
+      const locs = extractLocs(xml).map(normalizeUrl);
+      const isIndex = /<sitemapindex[\s>]/i.test(xml);
+
+      if (isIndex) {
+        for (const loc of locs) {
+          if (visited.size >= MAX_SITEMAP_FILES || urls.length >= MAX_SITEMAP_URLS) {
+            break;
+          }
+          const nested = await collectSitemapUrls(loc, visited, depth + 1);
+          urls.push(...nested);
+        }
+      } else {
+        urls.push(
+          ...locs.filter((loc) => {
+            try {
+              const parsed = new URL(loc);
+              return parsed.origin === new URL(startUrl).origin;
+            } catch {
+              return false;
+            }
+          })
+        );
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return Array.from(new Set(urls.map(normalizeUrl))).slice(0, MAX_SITEMAP_URLS);
+}
+
+export async function fetchPageSnapshot(url: string): Promise<PageSnapshot> {
+  const html = await fetchText(url);
   const text = stripHtml(html);
   const excerpt = text.slice(0, 300);
 
@@ -58,13 +150,20 @@ export async function fetchPageSnapshot(url: string): Promise<PageSnapshot> {
 }
 
 export async function collectResearch(inputUrl: string, blogUrls: string[]) {
-  const uniqueUrls = Array.from(new Set([inputUrl, ...blogUrls].filter(Boolean)));
+  const websiteUrl = normalizeUrl(inputUrl);
+  const baseBlogUrls = Array.from(new Set(blogUrls.filter(Boolean).map(normalizeUrl)));
+  const sitemapUrls = await collectSitemapUrls(websiteUrl);
+  const sitemapBlogUrls = sitemapUrls.filter(isLikelyBlogUrl);
+  const allBlogUrls = Array.from(new Set([...baseBlogUrls, ...sitemapBlogUrls]));
+  const snapshotUrls = [websiteUrl, ...allBlogUrls.slice(0, 20)];
 
-  const snapshots = await Promise.all(uniqueUrls.map((url) => fetchPageSnapshot(url)));
+  const snapshots = await Promise.all(snapshotUrls.map((url) => fetchPageSnapshot(url)));
   const [homepage, ...blogs] = snapshots;
 
   return {
     homepage,
-    blogs
+    blogs,
+    sitemapUrls,
+    sitemapBlogUrls
   };
 }

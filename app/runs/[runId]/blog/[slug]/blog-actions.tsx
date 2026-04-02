@@ -78,6 +78,7 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
         await postWorkflow({
           step: "regenerate-blog",
           runId,
+          articleSlug: slug,
           comments: regenerationComments.trim()
         });
         setRegenerationComments("");
@@ -103,6 +104,7 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
         await postWorkflow({
           step: "approve-blog",
           runId,
+          articleSlug: slug,
           approved,
           comments: approvalNotes.trim()
         });
@@ -128,6 +130,14 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
           Open in new tab
         </a>
       </div>
+
+      {visibleProgress ? (
+        <WorkflowProgressBar
+          progress={visibleProgress}
+          label={visibleProgress.action === "approve-blog" ? "Approval" : "Regeneration"}
+          variant="top"
+        />
+      ) : null}
 
       <section className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
         <div className="flex items-start justify-between gap-4 max-md:flex-col">
@@ -179,9 +189,6 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
                 Needs revision
               </button>
             </div>
-            {visibleProgress && activeAction === "approve-blog" ? (
-              <WorkflowProgressBar progress={visibleProgress} label="Approval in progress" />
-            ) : null}
             {!canApprove ? (
               <p className="text-sm text-neutral-600">Quality gate must pass before publish approval is enabled.</p>
             ) : null}
@@ -231,9 +238,6 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
                 {activeAction === "regenerate-blog" ? "Updating…" : "Submit regeneration"}
               </button>
             </div>
-            {visibleProgress && activeAction === "regenerate-blog" ? (
-              <WorkflowProgressBar progress={visibleProgress} label="Regeneration in progress" />
-            ) : null}
           </div>
         ) : null}
       </section>

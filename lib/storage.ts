@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  approvedArticleSchema,
+  approvedArticlesSchema,
   brandAnalysisSchema,
   blogApprovalSchema,
   blogQualitySchema,
@@ -20,6 +22,7 @@ import {
 } from "@/lib/schemas";
 import type {
   BrandAnalysis,
+  ApprovedArticle,
   BlogRevision,
   BlogQuality,
   BlogApproval,
@@ -69,6 +72,8 @@ export type RunResearchRecord = {
   updatedAt: string;
   homepage: PageSnapshot;
   blogs: PageSnapshot[];
+  sitemapUrls: string[];
+  sitemapBlogUrls: string[];
 };
 
 export type RunExistingTopicsRecord = {
@@ -152,6 +157,14 @@ export type RunApprovalsRecord = {
   approvals: BlogApproval[];
 };
 
+export type RunApprovedArticlesRecord = {
+  runId: string;
+  schemaVersion: typeof SCHEMA_VERSION;
+  createdAt: string;
+  updatedAt: string;
+  articles: ApprovedArticle[];
+};
+
 export type RunRegenerationNotesRecord = {
   runId: string;
   schemaVersion: typeof SCHEMA_VERSION;
@@ -174,6 +187,7 @@ export type RunBundle = {
   quality: RunQualityRecord | null;
   revisions: RunRevisionsRecord | null;
   approvals: RunApprovalsRecord | null;
+  approvedArticles: RunApprovedArticlesRecord | null;
   regenerationNotes: RunRegenerationNotesRecord | null;
 };
 
@@ -213,6 +227,50 @@ function countWords(markdown: string) {
     .split(/\s+/)
     .map((part) => part.trim())
     .filter(Boolean).length;
+}
+
+async function upsertApprovedArticle(
+  runId: string,
+  article: Omit<ApprovedArticle, "articleId" | "createdAt" | "updatedAt" | "feedbackCount"> & {
+    articleId?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    feedbackCount?: number;
+  }
+) {
+  const current = (await readJson<RunApprovedArticlesRecord>(runId, "approved-articles.json")) ?? {
+    runId,
+    schemaVersion: SCHEMA_VERSION,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+    articles: []
+  };
+
+  const timestamp = nowIso();
+  const existingArticle = current.articles.find((entry) => entry.articleSlug === article.articleSlug);
+  const nextArticle = approvedArticleSchema.parse({
+    articleId: article.articleId ?? article.articleSlug,
+    articleSlug: article.articleSlug,
+    createdAt: article.createdAt ?? timestamp,
+    updatedAt: article.updatedAt ?? timestamp,
+    topic: article.topic,
+    blog: article.blog,
+    quality: article.quality,
+    wordCount: article.wordCount,
+    approvalStatus: article.approvalStatus,
+    feedbackCount: article.feedbackCount ?? existingArticle?.feedbackCount ?? 0
+  });
+
+  const record: RunApprovedArticlesRecord = approvedArticlesSchema.parse({
+    runId,
+    schemaVersion: SCHEMA_VERSION,
+    createdAt: current.createdAt,
+    updatedAt: timestamp,
+    articles: [...current.articles.filter((entry) => entry.articleSlug !== nextArticle.articleSlug), nextArticle]
+  });
+
+  await writeJson(runId, "approved-articles.json", record);
+  return record;
 }
 
 export function createRunId(companyName?: string) {
@@ -264,7 +322,7 @@ export async function createRun(input: WorkflowInput, model: string) {
 
 export async function saveResearch(
   runId: string,
-  research: { homepage: PageSnapshot; blogs: PageSnapshot[] }
+  research: { homepage: PageSnapshot; blogs: PageSnapshot[]; sitemapUrls?: string[]; sitemapBlogUrls?: string[] }
 ) {
   const timestamp = nowIso();
   const record: RunResearchRecord = {
@@ -273,7 +331,9 @@ export async function saveResearch(
     createdAt: timestamp,
     updatedAt: timestamp,
     homepage: pageSnapshotSchema.parse(research.homepage),
-    blogs: research.blogs.map((page) => pageSnapshotSchema.parse(page))
+    blogs: research.blogs.map((page) => pageSnapshotSchema.parse(page)),
+    sitemapUrls: Array.from(new Set((research.sitemapUrls ?? []).filter(Boolean))),
+    sitemapBlogUrls: Array.from(new Set((research.sitemapBlogUrls ?? []).filter(Boolean)))
   };
 
   await writeJson(runId, "research.json", record);
@@ -419,6 +479,7 @@ export async function saveBlogRevision(
       ...current.revisions,
       blogRevisionSchema.parse({
         revisionId: revision.revisionId ?? `rev-${randomUUID().slice(0, 8)}`,
+        articleSlug: revision.articleSlug,
         createdAt: revision.createdAt ?? nowIso(),
         comments: revision.comments,
         blog: revision.blog,
@@ -476,6 +537,7 @@ export async function saveApproval(
       ...current.approvals,
       blogApprovalSchema.parse({
         approvalId: approval.approvalId ?? `approval-${randomUUID().slice(0, 8)}`,
+        articleSlug: approval.articleSlug,
         createdAt: approval.createdAt ?? nowIso(),
         approved: approval.approved,
         notes: approval.notes,
@@ -487,6 +549,18 @@ export async function saveApproval(
 
   await writeJson(runId, "approvals.json", record);
   return record;
+}
+
+export async function saveApprovedArticle(
+  runId: string,
+  article: Omit<ApprovedArticle, "articleId" | "createdAt" | "updatedAt" | "feedbackCount"> & {
+    articleId?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    feedbackCount?: number;
+  }
+) {
+  return upsertApprovedArticle(runId, article);
 }
 
 export async function updateManifest(
@@ -539,9 +613,26 @@ export async function loadRun(runId: string): Promise<RunBundle> {
   const quality = await readJson<RunQualityRecord>(runId, "quality.json");
   const revisions = await readJson<RunRevisionsRecord>(runId, "blog-revisions.json");
   const approvals = await readJson<RunApprovalsRecord>(runId, "approvals.json");
+  const approvedArticlesRaw = await readJson<RunApprovedArticlesRecord>(runId, "approved-articles.json");
   const regenerationNotes = await readJson<RunRegenerationNotesRecord>(runId, "regeneration-notes.json");
 
-  return { manifest, input, research, existingTopics, analysis, topicCandidates, topics, topicValidation, approvedTopic, blog, quality, revisions, approvals, regenerationNotes };
+  return {
+    manifest,
+    input,
+    research,
+    existingTopics,
+    analysis,
+    topicCandidates,
+    topics,
+    topicValidation,
+    approvedTopic,
+    blog,
+    quality,
+    revisions,
+    approvals,
+    approvedArticles: approvedArticlesRaw ? approvedArticlesSchema.parse(approvedArticlesRaw) : null,
+    regenerationNotes
+  };
 }
 
 export async function listRunSummaries(): Promise<RunSummary[]> {
