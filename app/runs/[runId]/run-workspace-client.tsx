@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import useWorkflowProgress from "@/lib/use-workflow-progress";
 import type { RunBundle } from "@/lib/storage";
 import type { BlogQuality, GeneratedBlog, TopicSuggestion } from "@/lib/types";
@@ -41,12 +41,6 @@ async function postWorkflow(step: string, runId: string, payload?: Record<string
 
 export default function RunWorkspaceClient({ runId, run }: Props) {
   const [topics, setTopics] = useState(run.topics?.topics ?? []);
-  const [selectedTopic, setSelectedTopic] = useState<TopicSuggestion | null>(
-    run.approvedTopic?.approvedTopic ?? null
-  );
-  const [blog, setBlog] = useState(run.blog?.blog ?? null);
-  const [wordCount, setWordCount] = useState(run.blog?.wordCount ?? null);
-  const [quality, setQuality] = useState(run.quality?.quality ?? null);
   const [approvedArticles, setApprovedArticles] = useState(run.approvedArticles?.articles ?? []);
   const [status, setStatus] = useState<string>(run.manifest?.status ?? "created");
   const [error, setError] = useState<string | null>(null);
@@ -83,14 +77,6 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
     return () => clearTimeout(timer);
   }, [activeAction, workflowProgress?.isComplete]);
 
-  const blogUrl = useMemo(() => {
-    if (!blog?.slug) {
-      return null;
-    }
-
-    return `/runs/${runId}/blog/${blog.slug}`;
-  }, [blog?.slug, runId]);
-
   function suggestTopics() {
     startTransition(async () => {
       try {
@@ -112,21 +98,26 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
   }
 
   function generateBlog(topic: TopicSuggestion) {
+    const previousTopics = topics;
     startTransition(async () => {
       try {
         setError(null);
         setActiveAction("generate-blog");
         setStatus(`Generating “${topic.title}”…`);
-        setSelectedTopic(topic);
 
         const data = await postWorkflow("generate-blog", runId, {
           selectedTopic: topic
         });
 
         if ("blog" in data) {
-          setBlog(data.blog);
-          setWordCount(data.wordCount);
-          setQuality(data.quality);
+          setTopics((current) =>
+            current.filter(
+              (item) =>
+                item.title !== topic.title &&
+                item.primaryKeyword !== topic.primaryKeyword &&
+                item.searchIntent !== topic.searchIntent
+            )
+          );
           setApprovedArticles((current) => {
             const nextArticle = {
               articleId: data.blog.slug,
@@ -149,6 +140,7 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
         const message = caughtError instanceof Error ? caughtError.message : "Unknown error";
         setError(message);
         setStatus("Blog generation failed.");
+        setTopics(previousTopics);
       }
     });
   }
@@ -174,7 +166,7 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
             <strong className="block text-sm text-neutral-900">Run ID</strong>
             <p className="mt-1 text-sm text-neutral-600">{runId}</p>
             <p className="mt-1 text-sm text-neutral-600">Manifest: {run.manifest?.status ?? "created"}</p>
-            <p className="mt-1 text-sm text-neutral-600">Blog: {blog ? "available" : "not generated yet"}</p>
+            <p className="mt-1 text-sm text-neutral-600">Approved articles: {approvedArticles.length}</p>
           </div>
         </div>
       </div>
@@ -198,17 +190,41 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-neutral-950">Analysis so far</h2>
               <p className="text-sm text-neutral-600">Brand summary, audience, voice, SEO notes, & source coverage from the sync.</p>
             </div>
-            <div className="grid gap-2 rounded-3xl border border-white/70 bg-white/70 p-4 shadow-sm">
+            <div className="grid gap-3 rounded-3xl border border-white/70 bg-white/70 p-4 shadow-sm">
               <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Site Sources</p>
-              <p className="text-sm text-neutral-700">
-                Website: <span className="font-medium text-neutral-950">{input?.websiteUrl ?? "n/a"}</span>
-              </p>
-              <p className="text-sm text-neutral-700">
-                Blog URLs: <span className="font-medium text-neutral-950">{blogSources.length}</span>
-              </p>
-              <p className="text-sm text-neutral-700">
-                Sitemap URLs: <span className="font-medium text-neutral-950">{sitemapUrls.length}</span>
-              </p>
+              <div className="grid gap-2 text-sm text-neutral-700">
+                <p>
+                  Website: <span className="font-medium text-neutral-950">{input?.websiteUrl ?? "n/a"}</span>
+                </p>
+                <p>
+                  Blog URLs: <span className="font-medium text-neutral-950">{blogSources.length}</span>
+                </p>
+                <p>
+                  Sitemap URLs: <span className="font-medium text-neutral-950">{sitemapUrls.length}</span>
+                </p>
+              </div>
+              <div className="max-h-32 overflow-auto rounded-2xl border border-black/5 bg-white/80 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
+                  Blog URL list
+                </p>
+                <div className="mt-2 grid gap-2 text-xs text-neutral-600">
+                  {blogSources.length === 0 ? (
+                    <p>No blog URLs discovered.</p>
+                  ) : (
+                    blogSources.map((page) => (
+                      <div key={page.url} className="rounded-xl border border-black/5 bg-neutral-50 px-3 py-2">
+                        <p className="font-medium text-neutral-900">{page.title}</p>
+                        <p className="break-all text-neutral-600">{page.url}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              {run.research?.resolvedSitemapUrl ? (
+                <p className="text-xs text-neutral-500">
+                  Resolved sitemap: <span className="break-all text-neutral-800">{run.research.resolvedSitemapUrl}</span>
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -310,14 +326,20 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
         ) : (
           <div className="mt-5 grid gap-4">
             {topics.map((topic) => (
-              <article className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4" key={topic.title}>
+              <article
+                className="group rounded-[1.75rem] border border-black/10 bg-gradient-to-br from-white via-[#fffaf2] to-[#fff4ea] p-4 shadow-[0_18px_48px_rgba(195,93,46,0.08)] transition duration-200 hover:-translate-y-1 hover:border-[#c35d2e]/30 hover:shadow-[0_24px_60px_rgba(195,93,46,0.16)]"
+                key={topic.title}
+              >
                 <div className="flex items-start justify-between gap-4 max-md:flex-col">
                   <div className="min-w-0">
-                    <h3 className="text-lg font-semibold text-neutral-900">{topic.title}</h3>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#c35d2e]/15 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a4520]">
+                      Suggested topic
+                    </div>
+                    <h3 className="mt-3 text-lg font-semibold text-neutral-950">{topic.title}</h3>
                     <p className="mt-1 text-sm leading-6 text-neutral-600">{topic.rankingRationale}</p>
                   </div>
                   <button
-                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 disabled:cursor-progress disabled:opacity-60"
+                    className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-100 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 disabled:cursor-progress disabled:opacity-60"
                     type="button"
                     disabled={isPending || activeAction === "generate-blog"}
                     onClick={() => generateBlog(topic)}
@@ -328,10 +350,10 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
                   </button>
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-2 text-sm text-neutral-600">
-                  <span>Keyword: {topic.primaryKeyword}</span>
-                  <span>Intent: {topic.searchIntent}</span>
-                  <span>SEO angle: {topic.seoAngle}</span>
+                <div className="mt-4 flex flex-wrap gap-2 text-sm text-neutral-600">
+                  <span className="rounded-full border border-black/5 bg-white/80 px-3 py-1">Keyword: {topic.primaryKeyword}</span>
+                  <span className="rounded-full border border-black/5 bg-white/80 px-3 py-1">Intent: {topic.searchIntent}</span>
+                  <span className="rounded-full border border-black/5 bg-white/80 px-3 py-1">SEO angle: {topic.seoAngle}</span>
                 </div>
               </article>
             ))}
@@ -378,39 +400,6 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
           </div>
         )}
       </section>
-
-      {blog ? (
-        <section className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
-          <div className="flex items-center justify-between gap-4 max-md:flex-col max-md:items-start">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-900">Generated Blog</h2>
-              <p className="text-sm text-neutral-600">Open the preview page to review, approve, or regenerate the article.</p>
-            </div>
-            {blogUrl ? (
-              <a
-                className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/25"
-                href={blogUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open preview
-              </a>
-            ) : null}
-          </div>
-
-          <div className="mt-5 rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
-            <h3 className="text-lg font-semibold text-neutral-900">{blog.title}</h3>
-            <p className="mt-2 text-sm leading-6 text-neutral-600">{blog.summary}</p>
-            {wordCount ? <p className="mt-2 text-sm text-neutral-500">Word count: {wordCount}</p> : null}
-            {quality ? (
-              <p className="mt-1 text-sm text-neutral-500">
-                Quality: {quality.score}% | {quality.publishStatus}
-              </p>
-            ) : null}
-            {selectedTopic ? <p className="mt-1 text-sm text-neutral-500">Generated from: {selectedTopic.title}</p> : null}
-          </div>
-        </section>
-      ) : null}
 
       {error ? (
         <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" aria-live="polite">

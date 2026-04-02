@@ -74,6 +74,7 @@ export type RunResearchRecord = {
   blogs: PageSnapshot[];
   sitemapUrls: string[];
   sitemapBlogUrls: string[];
+  resolvedSitemapUrl: string | null;
 };
 
 export type RunExistingTopicsRecord = {
@@ -322,7 +323,13 @@ export async function createRun(input: WorkflowInput, model: string) {
 
 export async function saveResearch(
   runId: string,
-  research: { homepage: PageSnapshot; blogs: PageSnapshot[]; sitemapUrls?: string[]; sitemapBlogUrls?: string[] }
+  research: {
+    homepage: PageSnapshot;
+    blogs: PageSnapshot[];
+    sitemapUrls?: string[];
+    sitemapBlogUrls?: string[];
+    resolvedSitemapUrl?: string | null;
+  }
 ) {
   const timestamp = nowIso();
   const record: RunResearchRecord = {
@@ -333,7 +340,8 @@ export async function saveResearch(
     homepage: pageSnapshotSchema.parse(research.homepage),
     blogs: research.blogs.map((page) => pageSnapshotSchema.parse(page)),
     sitemapUrls: Array.from(new Set((research.sitemapUrls ?? []).filter(Boolean))),
-    sitemapBlogUrls: Array.from(new Set((research.sitemapBlogUrls ?? []).filter(Boolean)))
+    sitemapBlogUrls: Array.from(new Set((research.sitemapBlogUrls ?? []).filter(Boolean))),
+    resolvedSitemapUrl: research.resolvedSitemapUrl ?? null
   };
 
   await writeJson(runId, "research.json", record);

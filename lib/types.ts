@@ -97,6 +97,12 @@ export type BlogRevision = {
   quality: BlogQuality;
 };
 
+export type ResolvedSitemap = {
+  resolvedSitemapUrl: string | null;
+  sitemapUrls: string[];
+  sitemapBlogUrls: string[];
+};
+
 export type RegenerationNote = {
   revisionId: string;
   articleSlug: string;

@@ -19,7 +19,8 @@ export const researchSchema = z.object({
   homepage: pageSnapshotSchema,
   blogs: z.array(pageSnapshotSchema),
   sitemapUrls: z.array(z.string()).default([]),
-  sitemapBlogUrls: z.array(z.string()).default([])
+  sitemapBlogUrls: z.array(z.string()).default([]),
+  resolvedSitemapUrl: z.string().nullable().default(null)
 });
 
 export const existingTopicSchema = z.object({
@@ -57,7 +58,7 @@ export const topicSuggestionSchema = z.object({
   outline: z.array(z.string())
 });
 
-export const topicListSchema = z.array(topicSuggestionSchema).length(10);
+export const topicListSchema = z.array(topicSuggestionSchema);
 
 export const topicValidationRejectedSchema = z.object({
   topic: topicSuggestionSchema,

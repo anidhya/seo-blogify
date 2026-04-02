@@ -54,7 +54,8 @@ function formatResearchBlock(
   input: WorkflowInput,
   homepageText: string,
   blogText: string,
-  sitemapUrls: string[] = []
+  sitemapUrls: string[] = [],
+  resolvedSitemapUrl: string | null = null
 ) {
   return [
     `Company name hint: ${input.companyName || "Not provided"}`,
@@ -67,13 +68,16 @@ function formatResearchBlock(
     "Blog research:",
     blogText,
     "",
-    formatSitemapBlock(sitemapUrls)
+    formatSitemapBlock(sitemapUrls, resolvedSitemapUrl)
   ].join("\n");
 }
 
-function formatSitemapBlock(urls: string[]) {
+function formatSitemapBlock(urls: string[], resolvedSitemapUrl: string | null = null) {
   return urls.length > 0
-    ? `Sitemap URLs:\n${urls.map((url, index) => `${index + 1}. ${url}`).join("\n")}`
+    ? [
+        resolvedSitemapUrl ? `Resolved sitemap URL: ${resolvedSitemapUrl}` : "Resolved sitemap URL: Not available",
+        `Sitemap URLs:\n${urls.map((url, index) => `${index + 1}. ${url}`).join("\n")}`
+      ].join("\n")
     : "Sitemap URLs: None discovered.";
 }
 
@@ -164,7 +168,13 @@ function formatBlogStructurePrompt(params: {
     "",
     `Existing site content and link targets:\n${params.internalLinkHints}`,
     "",
-    formatResearchBlock(params.input, params.homepageText, params.blogText, params.sitemapUrls)
+    formatResearchBlock(
+      params.input,
+      params.homepageText,
+      params.blogText,
+      params.sitemapUrls,
+      null
+    )
   ].join("\n");
 }
 
@@ -301,7 +311,13 @@ async function generateValidatedTopicSet(run: Awaited<ReturnType<typeof loadRun>
       "",
       `Brand analysis:\n${JSON.stringify(run.analysis.analysis, null, 2)}`,
       "",
-      formatResearchBlock(run.input, homepageText, blogText)
+      formatResearchBlock(
+        run.input,
+        homepageText,
+        blogText,
+        run.research.sitemapUrls ?? [],
+        run.research.resolvedSitemapUrl ?? null
+      )
     ];
 
     if (rejectedTopics.length > 0) {
@@ -373,7 +389,13 @@ export async function POST(request: Request) {
         "Consider sitemap coverage as part of the site's existing content inventory.",
         "Respond using the provided JSON schema.",
         "",
-    formatResearchBlock(payload, homepageText, blogText, research.sitemapUrls ?? [])
+        formatResearchBlock(
+          payload,
+          homepageText,
+          blogText,
+          research.sitemapUrls ?? [],
+          research.resolvedSitemapUrl ?? null
+        )
       ].join("\n");
 
       const analysis = await generateStructuredAnalysis(analysisPrompt);
@@ -425,6 +447,11 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Saved run data is incomplete." }, { status: 400 });
       }
 
+      const selectedTopic = payload.selectedTopic;
+      if (!selectedTopic) {
+        return NextResponse.json({ error: "Selected topic is required for blog generation." }, { status: 400 });
+      }
+
       await setProgress(runId, "generate-blog", 10, "Assembling blog prompt");
       const homepageText = `URL: ${run.research.homepage.url}\nTitle: ${run.research.homepage.title}\nExcerpt: ${run.research.homepage.excerpt}\nContent:\n${run.research.homepage.content}`;
       const blogText = run.research.blogs
@@ -434,10 +461,17 @@ export async function POST(request: Request) {
         )
         .join("\n\n");
 
-      await saveApprovedTopic(runId, payload.selectedTopic);
+      await saveApprovedTopic(runId, selectedTopic);
+      const remainingTopics = (run.topics?.topics ?? []).filter((topic) => {
+        const sameTitle = topic.title === selectedTopic.title;
+        const sameKeyword = topic.primaryKeyword === selectedTopic.primaryKeyword;
+        const sameIntent = topic.searchIntent === selectedTopic.searchIntent;
+        return !(sameTitle || sameKeyword || sameIntent);
+      });
+      await saveTopics(runId, remainingTopics);
 
       const blogPrompt = formatBlogStructurePrompt({
-        topic: payload.selectedTopic,
+        topic: selectedTopic,
         analysis: run.analysis.analysis,
         input: run.input,
         homepageText,
@@ -453,7 +487,7 @@ export async function POST(request: Request) {
         formatBlogQualityPrompt({
           blog,
           analysis: run.analysis.analysis,
-          topic: payload.selectedTopic
+          topic: selectedTopic
         })
       );
 
@@ -466,7 +500,7 @@ export async function POST(request: Request) {
             blog,
             quality,
             analysis: run.analysis.analysis,
-            topic: payload.selectedTopic,
+            topic: selectedTopic,
             attempt: attempts
           })
         );
@@ -475,7 +509,7 @@ export async function POST(request: Request) {
           formatBlogQualityPrompt({
             blog,
             analysis: run.analysis.analysis,
-            topic: payload.selectedTopic
+            topic: selectedTopic
           })
         );
       }
@@ -484,7 +518,7 @@ export async function POST(request: Request) {
         runId,
         run,
         blog,
-        topic: payload.selectedTopic,
+        topic: selectedTopic,
         articleSlug: blog.slug,
         rewriteAttempts: attempts
       });

@@ -81,12 +81,25 @@ async function fetchText(url: string) {
     throw new Error(`Failed to fetch ${url}: ${response.status}`);
   }
 
-  return response.text();
+  return {
+    text: await response.text(),
+    finalUrl: normalizeUrl(response.url || url)
+  };
 }
 
-async function collectSitemapUrls(startUrl: string, visited = new Set<string>(), depth = 0): Promise<string[]> {
+type SitemapDiscovery = {
+  urls: string[];
+  resolvedSitemapUrl: string | null;
+};
+
+async function collectSitemapUrls(
+  startUrl: string,
+  visited = new Set<string>(),
+  depth = 0,
+  resolvedSitemapUrl: string | null = null
+): Promise<SitemapDiscovery> {
   if (depth > 2 || visited.size >= MAX_SITEMAP_FILES) {
-    return [];
+    return { urls: [], resolvedSitemapUrl };
   }
 
   const sitemapUrl = new URL("/sitemap.xml", new URL(startUrl).origin).toString();
@@ -104,7 +117,8 @@ async function collectSitemapUrls(startUrl: string, visited = new Set<string>(),
 
     try {
       visited.add(candidate);
-      const xml = await fetchText(candidate);
+      const { text: xml, finalUrl } = await fetchText(candidate);
+      const nextResolved = resolvedSitemapUrl ?? finalUrl;
       const locs = extractLocs(xml).map(normalizeUrl);
       const isIndex = /<sitemapindex[\s>]/i.test(xml);
 
@@ -113,8 +127,9 @@ async function collectSitemapUrls(startUrl: string, visited = new Set<string>(),
           if (visited.size >= MAX_SITEMAP_FILES || urls.length >= MAX_SITEMAP_URLS) {
             break;
           }
-          const nested = await collectSitemapUrls(loc, visited, depth + 1);
-          urls.push(...nested);
+          const nested = await collectSitemapUrls(loc, visited, depth + 1, nextResolved);
+          urls.push(...nested.urls);
+          resolvedSitemapUrl = resolvedSitemapUrl ?? nested.resolvedSitemapUrl ?? nextResolved;
         }
       } else {
         urls.push(
@@ -127,22 +142,26 @@ async function collectSitemapUrls(startUrl: string, visited = new Set<string>(),
             }
           })
         );
+        resolvedSitemapUrl = resolvedSitemapUrl ?? nextResolved;
       }
     } catch {
       continue;
     }
   }
 
-  return Array.from(new Set(urls.map(normalizeUrl))).slice(0, MAX_SITEMAP_URLS);
+  return {
+    urls: Array.from(new Set(urls.map(normalizeUrl))).slice(0, MAX_SITEMAP_URLS),
+    resolvedSitemapUrl
+  };
 }
 
 export async function fetchPageSnapshot(url: string): Promise<PageSnapshot> {
-  const html = await fetchText(url);
+  const { text: html, finalUrl } = await fetchText(url);
   const text = stripHtml(html);
   const excerpt = text.slice(0, 300);
 
   return {
-    url,
+    url: finalUrl,
     title: extractTitle(html, url),
     excerpt,
     content: sliceContent(text)
@@ -152,7 +171,8 @@ export async function fetchPageSnapshot(url: string): Promise<PageSnapshot> {
 export async function collectResearch(inputUrl: string, blogUrls: string[]) {
   const websiteUrl = normalizeUrl(inputUrl);
   const baseBlogUrls = Array.from(new Set(blogUrls.filter(Boolean).map(normalizeUrl)));
-  const sitemapUrls = await collectSitemapUrls(websiteUrl);
+  const sitemapDiscovery = await collectSitemapUrls(websiteUrl);
+  const sitemapUrls = sitemapDiscovery.urls;
   const sitemapBlogUrls = sitemapUrls.filter(isLikelyBlogUrl);
   const allBlogUrls = Array.from(new Set([...baseBlogUrls, ...sitemapBlogUrls]));
   const snapshotUrls = [websiteUrl, ...allBlogUrls.slice(0, 20)];
@@ -164,6 +184,7 @@ export async function collectResearch(inputUrl: string, blogUrls: string[]) {
     homepage,
     blogs,
     sitemapUrls,
-    sitemapBlogUrls
+    sitemapBlogUrls,
+    resolvedSitemapUrl: sitemapDiscovery.resolvedSitemapUrl
   };
 }
