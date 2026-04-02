@@ -67,8 +67,8 @@ const generatedBlogSchema = z.object({
 
 const linkedInDraftSchema = z.object({
   articleSlug: z.string(),
-  headline: z.string(),
-  caption: z.string(),
+  suggestedTitle: z.string(),
+  suggestedDescription: z.string(),
   carouselPrompts: z
     .array(
       z.object({
@@ -79,6 +79,22 @@ const linkedInDraftSchema = z.object({
       })
     )
     .length(4),
+  generatedImages: z
+    .array(
+      z.object({
+        slideNumber: z.number(),
+        prompt: z.string(),
+        imageDataUrl: z.string(),
+        mimeType: z.string(),
+        model: z.string(),
+        generatedAt: z.string(),
+        renderMode: z.enum(["google-image", "preview"]).default("preview"),
+        providerResponseText: z.string().nullable().default(null)
+      })
+    )
+    .default([]),
+  imageGenerationStatus: z.enum(["idle", "pending", "queued", "generating", "partial", "ready", "failed"]).default("idle"),
+  imageModel: z.string().nullable().default(null),
   hashtags: z.array(z.string()).min(3).max(10),
   callToAction: z.string(),
   publishStatus: z.enum(["draft", "ready", "scheduled", "published", "failed"]),
@@ -277,7 +293,7 @@ export async function generateLinkedInDraft(prompt: string) {
       {
         role: "developer",
         content:
-          "You create LinkedIn publishing packs from approved articles. Produce carousel prompts that are concise, practical, and visually consistent."
+          "You create LinkedIn publishing packs from approved articles. Produce carousel prompts that are concise, practical, and visually consistent. Also write a LinkedIn-native suggested title and suggested description."
       },
       {
         role: "user",

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { RunBundle } from "@/lib/storage";
@@ -58,7 +59,7 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
   const [scheduleFor, setScheduleFor] = useState(toLocalDatetimeInput(schedule?.scheduledFor ?? null));
   const [error, setError] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<
-    "prepare-linkedin" | "approve-linkedin" | "schedule-linkedin" | "publish-linkedin" | null
+    "prepare-linkedin" | "queue-linkedin-images" | "approve-linkedin" | "schedule-linkedin" | "publish-linkedin" | null
   >(draft ? null : "prepare-linkedin");
   const [isPending, startTransition] = useTransition();
   const workflowProgress = useWorkflowProgress({ runId, enabled: Boolean(activeAction) });
@@ -85,6 +86,8 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
             stageLabel:
               activeAction === "prepare-linkedin"
                 ? "Preparing LinkedIn pack"
+                : activeAction === "queue-linkedin-images"
+                    ? "Queued for carousel generation"
                 : activeAction === "approve-linkedin"
                   ? "Recording approval"
                   : activeAction === "schedule-linkedin"
@@ -115,6 +118,24 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
         setActiveAction("prepare-linkedin");
         await postWorkflow({
           step: "prepare-linkedin",
+          runId,
+          articleSlug: slug
+        });
+        router.refresh();
+      } catch (caughtError) {
+        setError(caughtError instanceof Error ? caughtError.message : "Unknown error");
+        setActiveAction(null);
+      }
+    });
+  }
+
+  function generateLinkedInImages() {
+    startTransition(async () => {
+      try {
+        setError(null);
+        setActiveAction("queue-linkedin-images");
+        await postWorkflow({
+          step: "queue-linkedin-images",
           runId,
           articleSlug: slug
         });
@@ -204,7 +225,7 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
               LinkedIn publishing
             </div>
             <h1 className="mt-3 font-serif text-4xl tracking-[-0.04em] text-neutral-950 md:text-6xl">
-              {draft?.headline ?? "LinkedIn draft"}
+              {draft?.suggestedTitle ?? "LinkedIn draft"}
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-600 md:text-base">
               Carousel-ready prompts, approval flow, schedule controls, and publish state for {run.input?.companyName || "this brand"}.
@@ -221,6 +242,14 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
             <p className="text-sm text-neutral-700">
               Connection: <span className="font-semibold text-neutral-950">{connection?.connected ? "Connected" : "Not connected"}</span>
             </p>
+            <button
+              className="mt-2 inline-flex items-center justify-center rounded-full border border-[#8b5cf6]/20 bg-[#f5f3ff] px-4 py-2 text-sm font-medium text-[#6d28d9] transition hover:-translate-y-0.5 hover:bg-[#ede9fe] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/25 disabled:cursor-progress disabled:opacity-60"
+              type="button"
+              onClick={generateLinkedInPack}
+              disabled={isPending || activeAction === "prepare-linkedin"}
+            >
+              {draft ? "Regenerate pack" : "Generate pack"}
+            </button>
           </div>
         </div>
       </div>
@@ -229,14 +258,6 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
         <div className="rounded-[2rem] border border-black/10 bg-white/80 p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
           <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-950">No LinkedIn pack yet</h2>
           <p className="mt-2 text-sm text-neutral-600">Generate the LinkedIn prompts from the approved article.</p>
-          <button
-            className="mt-4 inline-flex items-center justify-center rounded-full bg-[#c35d2e] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#b65228] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/30 disabled:cursor-progress disabled:opacity-60"
-            type="button"
-            onClick={generateLinkedInPack}
-            disabled={isPending || activeAction === "prepare-linkedin"}
-          >
-            {activeAction === "prepare-linkedin" ? "Preparing…" : "Generate LinkedIn pack"}
-          </button>
         </div>
       ) : (
         <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -244,10 +265,56 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
             <section className="rounded-[2rem] border border-black/10 bg-white/85 p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
               <div className="flex items-start justify-between gap-4 max-md:flex-col">
                 <div>
+                  <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-950">Suggested post title</h2>
+                  <p className="mt-1 text-sm text-neutral-600">Use this as the main LinkedIn post title or hook.</p>
+                </div>
+                <CopyButton label="Copy title" text={draft.suggestedTitle} />
+              </div>
+              <div className="mt-4 rounded-[1.5rem] border border-black/10 bg-[#fffaf7] p-4">
+                <p className="text-sm leading-7 text-neutral-700 whitespace-pre-line">{draft.suggestedTitle}</p>
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-black/10 bg-white/85 p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
+              <div className="flex items-start justify-between gap-4 max-md:flex-col">
+                <div>
+                  <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-950">Suggested description</h2>
+                  <p className="mt-1 text-sm text-neutral-600">This is the LinkedIn-ready description or post body.</p>
+                </div>
+                <CopyButton label="Copy description" text={draft.suggestedDescription} />
+              </div>
+              <div className="mt-4 grid gap-3 rounded-[1.5rem] border border-black/10 bg-[#fffaf7] p-4">
+                <p className="text-sm leading-7 text-neutral-700 whitespace-pre-line">{draft.suggestedDescription}</p>
+                <div className="flex flex-wrap gap-2">
+                  {draft.hashtags.map((tag) => (
+                    <span key={tag} className="rounded-full bg-[#ede9fe] px-3 py-1 text-xs font-semibold text-[#6d28d9]">
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-sm text-neutral-700">
+                  <strong className="text-neutral-950">CTA:</strong> {draft.callToAction}
+                </p>
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-black/10 bg-white/85 p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
+              <div className="flex items-start justify-between gap-4 max-md:flex-col">
+                <div>
                   <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-950">Carousel prompts</h2>
                   <p className="mt-1 text-sm text-neutral-600">Four slide prompts with a consistent visual system.</p>
                 </div>
-                <CopyButton label="Copy prompts" text={promptCopy} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    className="inline-flex items-center justify-center rounded-full bg-[#0a66c2] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#0857a7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0a66c2]/30 disabled:cursor-progress disabled:opacity-60"
+                    type="button"
+                    onClick={generateLinkedInImages}
+                    disabled={isPending || activeAction === "queue-linkedin-images"}
+                  >
+                    {activeAction === "queue-linkedin-images" ? "Queued…" : "Queue images for generation"}
+                  </button>
+                  <CopyButton label="Copy prompts" text={promptCopy} />
+                </div>
               </div>
               <div className="mt-4 grid gap-4">
                 {draft.carouselPrompts.map((slide) => (
@@ -271,30 +338,67 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
                   </article>
                 ))}
               </div>
-            </section>
-
-            <section className="rounded-[2rem] border border-black/10 bg-white/85 p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
-              <div className="flex items-start justify-between gap-4 max-md:flex-col">
-                <div>
-                  <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-950">Caption and hashtags</h2>
-                  <p className="mt-1 text-sm text-neutral-600">Post copy ready for LinkedIn.</p>
-                </div>
-                <CopyButton label="Copy caption" text={`${draft.headline}\n\n${draft.caption}\n\n${draft.hashtags.map((tag) => `#${tag}`).join(" ")}`} />
-              </div>
-              <div className="mt-4 grid gap-3 rounded-[1.5rem] border border-black/10 bg-[#fffaf7] p-4">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-500">Headline</p>
-                <p className="text-lg font-semibold text-neutral-950">{draft.headline}</p>
-                <p className="text-sm leading-7 text-neutral-700 whitespace-pre-line">{draft.caption}</p>
-                <div className="flex flex-wrap gap-2">
-                  {draft.hashtags.map((tag) => (
-                    <span key={tag} className="rounded-full bg-[#ede9fe] px-3 py-1 text-xs font-semibold text-[#6d28d9]">
-                      #{tag}
+              <div className="mt-6 rounded-[1.5rem] border border-black/10 bg-white/80 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold tracking-[-0.03em] text-neutral-950">Generated images</h3>
+                    <p className="text-sm text-neutral-600">
+                      Google AI Studio images generated from the carousel prompts for this article.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-[#ede9fe] px-3 py-1 text-xs font-semibold text-[#6d28d9]">
+                      Model: {draft.imageModel ?? "not generated"}
                     </span>
-                  ))}
+                    <span className="rounded-full bg-[#f1f5f9] px-3 py-1 text-xs font-semibold text-neutral-600">
+                      Status: {draft.imageGenerationStatus}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-sm text-neutral-700">
-                  <strong className="text-neutral-950">CTA:</strong> {draft.callToAction}
-                </p>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  {draft.generatedImages.length ? (
+                    draft.generatedImages.map((image) => (
+                      <article
+                        key={`${image.slideNumber}-${image.generatedAt}`}
+                      className="group overflow-hidden rounded-[1.5rem] border border-black/10 bg-gradient-to-br from-white to-[#f8fafc] transition hover:-translate-y-1 hover:border-[#0a66c2]/20 hover:shadow-[0_22px_50px_rgba(10,102,194,0.12)]"
+                    >
+                        <div className="flex items-center justify-between gap-3 border-b border-black/5 px-4 py-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+                              Slide {image.slideNumber}
+                            </p>
+                            <p className="text-sm text-neutral-700">
+                              {image.model} · {image.renderMode === "google-image" ? "Google image" : "Preview asset"}
+                            </p>
+                          </div>
+                          <CopyButton label="Copy image prompt" text={image.prompt} />
+                        </div>
+                        <div className="bg-neutral-100">
+                          <Image
+                            alt={`LinkedIn carousel slide ${image.slideNumber}`}
+                            src={image.imageDataUrl}
+                            width={1000}
+                            height={1250}
+                            unoptimized
+                            className="h-auto w-full object-cover"
+                          />
+                        </div>
+                        <div className="grid gap-3 px-4 py-4">
+                          <p className="text-sm leading-6 text-neutral-700">{image.prompt}</p>
+                          {image.renderMode === "preview" ? (
+                            <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                              Google returned text guidance instead of image bytes. This slide is rendered as a preview asset so the workflow stays visible.
+                            </p>
+                          ) : null}
+                        </div>
+                      </article>
+                    ))
+                  ) : (
+                    <div className="rounded-[1.5rem] border border-dashed border-black/10 bg-[#f8fafc] px-4 py-6 text-sm text-neutral-600 md:col-span-2">
+                      No generated images yet. Queue the images above to create the 4 carousel slides.
+                    </div>
+                  )}
+                </div>
               </div>
             </section>
           </div>

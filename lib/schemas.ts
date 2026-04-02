@@ -127,16 +127,50 @@ export const linkedInCarouselPromptSchema = z.object({
   designNotes: z.string()
 });
 
-export const linkedInDraftSchema = z.object({
+export const linkedInGeneratedImageSchema = z.object({
+  slideNumber: z.number(),
+  prompt: z.string(),
+  imageDataUrl: z.string(),
+  mimeType: z.string(),
+  model: z.string(),
+  generatedAt: z.string(),
+  renderMode: z.enum(["google-image", "preview"]).default("preview"),
+  providerResponseText: z.string().nullable().default(null)
+});
+
+const linkedInDraftSchemaCurrent = z.object({
   articleSlug: z.string(),
-  headline: z.string(),
-  caption: z.string(),
+  suggestedTitle: z.string(),
+  suggestedDescription: z.string(),
   carouselPrompts: z.array(linkedInCarouselPromptSchema).length(4),
+  generatedImages: z.array(linkedInGeneratedImageSchema).default([]),
+  imageGenerationStatus: z.enum(["idle", "pending", "queued", "generating", "partial", "ready", "failed"]).default("idle"),
+  imageModel: z.string().nullable().default(null),
   hashtags: z.array(z.string()).min(3).max(10),
   callToAction: z.string(),
   publishStatus: z.enum(["draft", "ready", "scheduled", "published", "failed"]),
   reviewStatus: z.enum(["draft", "pending_review", "approved", "needs_revision"])
 });
+
+const linkedInDraftSchemaLegacy = z.object({
+  articleSlug: z.string(),
+  headline: z.string(),
+  caption: z.string(),
+  carouselPrompts: z.array(linkedInCarouselPromptSchema).length(4),
+  generatedImages: z.array(linkedInGeneratedImageSchema).default([]),
+  imageGenerationStatus: z.enum(["idle", "pending", "queued", "generating", "partial", "ready", "failed"]).default("idle"),
+  imageModel: z.string().nullable().default(null),
+  hashtags: z.array(z.string()).min(3).max(10),
+  callToAction: z.string(),
+  publishStatus: z.enum(["draft", "ready", "scheduled", "published", "failed"]),
+  reviewStatus: z.enum(["draft", "pending_review", "approved", "needs_revision"])
+}).transform(({ headline, caption, ...rest }) => ({
+  ...rest,
+  suggestedTitle: headline,
+  suggestedDescription: caption
+}));
+
+export const linkedInDraftSchema = z.union([linkedInDraftSchemaCurrent, linkedInDraftSchemaLegacy]);
 
 export const linkedInConnectionSchema = z.object({
   connected: z.boolean(),
@@ -230,6 +264,8 @@ export const workflowProgressSchema = z.object({
       "regenerate-blog",
       "approve-blog",
       "prepare-linkedin",
+      "queue-linkedin-images",
+      "generate-linkedin-images",
       "approve-linkedin",
       "schedule-linkedin",
       "publish-linkedin"

@@ -6,6 +6,8 @@ export type WorkflowStep =
   | "regenerate-blog"
   | "approve-blog"
   | "prepare-linkedin"
+  | "queue-linkedin-images"
+  | "generate-linkedin-images"
   | "approve-linkedin"
   | "schedule-linkedin"
   | "publish-linkedin";
@@ -147,11 +149,25 @@ export type LinkedInCarouselPrompt = {
   designNotes: string;
 };
 
+export type LinkedInGeneratedImage = {
+  slideNumber: number;
+  prompt: string;
+  imageDataUrl: string;
+  mimeType: string;
+  model: string;
+  generatedAt: string;
+  renderMode: "google-image" | "preview";
+  providerResponseText: string | null;
+};
+
 export type LinkedInDraft = {
   articleSlug: string;
-  headline: string;
-  caption: string;
+  suggestedTitle: string;
+  suggestedDescription: string;
   carouselPrompts: LinkedInCarouselPrompt[];
+  generatedImages: LinkedInGeneratedImage[];
+  imageGenerationStatus: "idle" | "pending" | "queued" | "generating" | "partial" | "ready" | "failed";
+  imageModel: string | null;
   hashtags: string[];
   callToAction: string;
   publishStatus: "draft" | "ready" | "scheduled" | "published" | "failed";

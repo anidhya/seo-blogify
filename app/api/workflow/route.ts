@@ -9,6 +9,7 @@ import {
   generateTopicSuggestions,
   rewriteBlogDraft
 } from "@/lib/openai";
+import { generateLinkedInCarouselImages } from "@/lib/google-ai";
 import {
   deriveExistingTopics,
   deriveExistingTopicsFromUrls,
@@ -21,6 +22,7 @@ import type {
   BlogQuality,
   BrandAnalysis,
   GeneratedBlog,
+  LinkedInGeneratedImage,
   TopicSuggestion,
   WorkflowInput,
   WorkflowStep,
@@ -128,8 +130,8 @@ function buildLinkedInPrompt(params: {
     "Return exactly 4 carousel-ready slide prompts.",
     "Keep one coherent visual system across all slides: same palette, same typography style, same art direction, and consistent layout logic.",
     "Each slide should be useful on its own and collectively tell one clear story.",
-    "Also return a LinkedIn headline, caption, CTA, and hashtags.",
-    "The caption should sound natural on LinkedIn, not like a blog excerpt.",
+    "Also return a LinkedIn suggested title and suggested description for the post.",
+    "The suggested description should sound natural on LinkedIn, not like a blog excerpt.",
     "The carousel prompts should be ready to hand off to a design or image generation workflow later.",
     "Use the article's thesis, key takeaways, and FAQ themes as the source of truth.",
     "",
@@ -151,12 +153,13 @@ function buildFallbackLinkedInDraft(params: {
   topic: TopicSuggestion;
 }): LinkedInDraft {
   const focus = params.topic.primaryKeyword || params.blog.meta.keywords[0] || params.blog.title;
-  const caption = `${params.blog.summary}\n\nIf you're building around ${focus}, this carousel breaks the idea into a simple, usable framework.`;
+  const suggestedTitle = `${params.blog.title}`;
+  const suggestedDescription = `${params.blog.summary}\n\nIf you're building around ${focus}, this carousel breaks the idea into a simple, usable framework.`;
 
   return {
     articleSlug: params.blog.slug,
-    headline: params.blog.title,
-    caption,
+    suggestedTitle,
+    suggestedDescription,
     carouselPrompts: [
       {
         slideNumber: 1,
@@ -183,6 +186,9 @@ function buildFallbackLinkedInDraft(params: {
         designNotes: "Finish with the same visual system and a strong CTA zone."
       }
     ],
+    generatedImages: [],
+    imageGenerationStatus: "idle",
+    imageModel: null,
     hashtags: [focus, params.topic.seoAngle, "LinkedInMarketing", "ContentStrategy"].map((item) =>
       item.toLowerCase().replace(/\s+/g, "")
     ),
@@ -198,14 +204,22 @@ function getLinkedInArticleRecord(run: Awaited<ReturnType<typeof loadRun>>, arti
 
 async function generateLinkedInDraftForRun(params: {
   run: Awaited<ReturnType<typeof loadRun>>;
+  articleSlug: string;
 }) {
-  if (!params.run.blog?.blog || !params.run.analysis || !params.run.input) {
+  if (!params.run.analysis || !params.run.input) {
     throw new Error("Saved run data is incomplete.");
   }
 
-  const articleBlog = params.run.blog.blog;
+  const approvedArticle = params.run.approvedArticles?.articles.find((article) => article.articleSlug === params.articleSlug) ?? null;
+  const articleBlog =
+    approvedArticle?.blog ?? (params.run.blog?.blog?.slug === params.articleSlug ? params.run.blog.blog : null);
+
+  if (!articleBlog) {
+    throw new Error("LinkedIn source article is not available.");
+  }
+
   const topic =
-    params.run.approvedTopic?.approvedTopic ?? {
+    approvedArticle?.topic ?? params.run.approvedTopic?.approvedTopic ?? {
       title: articleBlog.title,
       primaryKeyword: articleBlog.meta.keywords[0] ?? articleBlog.title,
       searchIntent: "LinkedIn promotion",
@@ -230,6 +244,83 @@ async function generateLinkedInDraftForRun(params: {
       blog: articleBlog,
       topic
     });
+  }
+}
+
+async function queueLinkedInImagesForArticle(params: {
+  runId: string;
+  articleSlug: string;
+}) {
+  const run = await loadRun(params.runId);
+  const linkedInRecord = getLinkedInArticleRecord(run, params.articleSlug);
+  const draft = linkedInRecord?.draft ?? null;
+
+  if (!draft) {
+    throw new Error("LinkedIn draft is not available.");
+  }
+
+  await setProgress(params.runId, "queue-linkedin-images", 5, "Queued for Google image generation");
+  const queuedDraft: LinkedInDraft = {
+    ...draft,
+    imageGenerationStatus: "queued",
+    generatedImages: draft.generatedImages ?? [],
+    imageModel: draft.imageModel ?? null
+  };
+  await saveLinkedInDraft(params.runId, queuedDraft);
+
+  const generatedImagesInProgress: LinkedInGeneratedImage[] = [];
+  await setProgress(params.runId, "queue-linkedin-images", 18, "Starting first slide");
+
+  try {
+    const generatedImages = await generateLinkedInCarouselImages({
+      draft: queuedDraft,
+      retriesPerSlide: 4,
+      baseDelayMs: 1500,
+      onSlideGenerated: async ({ slideNumber, generatedCount, total, image, model }) => {
+        generatedImagesInProgress.push(image);
+        const percent = 18 + Math.round((generatedCount / total) * 72);
+        await setProgress(params.runId, "queue-linkedin-images", percent, `Generating slide ${slideNumber}`);
+        await saveLinkedInDraft(params.runId, {
+          ...queuedDraft,
+          generatedImages: [...generatedImagesInProgress].sort((left, right) => left.slideNumber - right.slideNumber),
+          imageGenerationStatus:
+            generatedCount < total ? "generating" : "ready",
+          imageModel: model
+        });
+      }
+    });
+
+    const enrichedDraft: LinkedInDraft = {
+      ...queuedDraft,
+      generatedImages,
+      imageGenerationStatus: generatedImages.length === 4 ? "ready" : "partial",
+      imageModel: generatedImages[0]?.model ?? process.env.GOOGLE_IMAGE_MODEL ?? "gemini-2.5-flash-image"
+    };
+
+    await setProgress(params.runId, "queue-linkedin-images", 95, "Saving generated images");
+    await saveLinkedInDraft(params.runId, enrichedDraft);
+    await updateManifest(params.runId, { steps: { linkedin: true } });
+    await setProgress(params.runId, "queue-linkedin-images", 100, "LinkedIn images ready", true);
+
+    return enrichedDraft;
+  } catch (error) {
+    const partialStatus = generatedImagesInProgress.length > 0 ? "partial" : "failed";
+    const partialDraft: LinkedInDraft = {
+      ...queuedDraft,
+      generatedImages: generatedImagesInProgress.sort((left, right) => left.slideNumber - right.slideNumber),
+      imageGenerationStatus: partialStatus
+    };
+
+    await saveLinkedInDraft(params.runId, partialDraft);
+    await setProgress(
+      params.runId,
+      "queue-linkedin-images",
+      generatedImagesInProgress.length > 0 ? 82 : 100,
+      partialStatus === "partial" ? "Some images generated before a throttle or error" : "Image generation failed",
+      partialStatus !== "partial"
+    );
+
+    throw error;
   }
 }
 
@@ -708,12 +799,12 @@ export async function POST(request: Request) {
       }
 
       const run = await loadRun(runId);
-      if (!run.blog?.blog) {
-        return NextResponse.json({ error: "Saved blog data is incomplete." }, { status: 400 });
+      if (!run.analysis || !run.input) {
+        return NextResponse.json({ error: "Saved run data is incomplete." }, { status: 400 });
       }
 
       await setProgress(runId, "prepare-linkedin", 20, "Preparing LinkedIn carousel prompts");
-      const linkedinDraft = await generateLinkedInDraftForRun({ run });
+      const linkedinDraft = await generateLinkedInDraftForRun({ run, articleSlug });
       await setProgress(runId, "prepare-linkedin", 70, "Saving LinkedIn draft");
       await saveLinkedInDraft(runId, linkedinDraft);
       await updateManifest(runId, { steps: { linkedin: true } });
@@ -722,6 +813,22 @@ export async function POST(request: Request) {
       return NextResponse.json({
         runId,
         draft: linkedinDraft
+      });
+    }
+
+    if (step === "queue-linkedin-images" || step === "generate-linkedin-images") {
+      const runId = body.runId;
+      const articleSlug = body.articleSlug;
+
+      if (!runId || !articleSlug) {
+        return NextResponse.json({ error: "Run ID and article slug are required." }, { status: 400 });
+      }
+
+      const enrichedDraft = await queueLinkedInImagesForArticle({ runId, articleSlug });
+
+      return NextResponse.json({
+        runId,
+        draft: enrichedDraft
       });
     }
 
@@ -827,7 +934,7 @@ export async function POST(request: Request) {
       const published = await publishLinkedInPost({
         accessToken: connection.accessToken,
         authorUrn: connection.memberUrn,
-        text: `${linkedInRecord.draft.headline}\n\n${linkedInRecord.draft.caption}`,
+        text: `${linkedInRecord.draft.suggestedTitle}\n\n${linkedInRecord.draft.suggestedDescription}`,
         articleUrl: run.input?.websiteUrl || undefined
       });
       await saveLinkedInPublication(runId, articleSlug, {
@@ -1056,7 +1163,7 @@ export async function POST(request: Request) {
 
       if (approved) {
         await setProgress(runId, "approve-blog", 55, "Generating LinkedIn carousel prompts");
-        const linkedinDraft = await generateLinkedInDraftForRun({ run });
+        const linkedinDraft = await generateLinkedInDraftForRun({ run, articleSlug });
         await saveLinkedInDraft(runId, linkedinDraft);
         await updateManifest(runId, { steps: { blog: true, linkedin: true } });
       }
