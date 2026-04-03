@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import type { RunSummary, WorkflowProgress } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import WorkflowProgressBar from "./components/workflow-progress";
+import WorkspaceShell from "./components/workspace-shell";
 
 type WorkflowResponse = { runId: string } | { error: string };
 
@@ -190,15 +191,24 @@ export default function HomePage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-[min(1600px,80vw)] px-5 py-7 max-lg:max-w-full">
-      <section className="grid gap-6">
-        <div className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
+    <WorkspaceShell
+      title="Brand Sync"
+      subtitle="Scan a site, approve topics, and open an approved article workflow."
+      navItems={[
+        { label: "Sync", href: "#brand-sync", icon: "sync", active: true },
+        { label: "Process", href: "#how-it-works", icon: "analysis" },
+        { label: "Profiles", href: "#synced-profiles", icon: "articles" },
+        { label: "FAQ", href: "#faq", icon: "publish" }
+      ]}
+    >
+      <section className="grid gap-4">
+        <div id="brand-sync" className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-5 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur scroll-mt-24">
           <div className="flex flex-col gap-3">
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-black/10 bg-white/60 px-4 py-2 text-sm text-neutral-600 backdrop-blur">
               <span className="h-2.5 w-2.5 rounded-full bg-[#c35d2e]" />
               Brand-aware AI blog pipeline
             </div>
-            <h1 className="font-serif text-4xl tracking-[-0.04em] text-neutral-900 md:text-6xl">
+            <h1 className="font-serif text-4xl tracking-[-0.04em] text-neutral-900 md:text-5xl">
               Publish articles that actually sound on-brand
             </h1>
             <p className="max-w-2xl text-sm leading-6 text-neutral-600 md:text-base">
@@ -206,7 +216,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="mt-6 grid gap-3 md:grid-cols-3">
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
             <div className="rounded-3xl border border-black/10 bg-white/80 p-4">
               <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Workflow</p>
               <p className="mt-2 text-lg font-semibold text-neutral-900">Scan → Approve → Draft</p>
@@ -241,7 +251,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
               <label className="text-sm font-semibold text-neutral-800" htmlFor="websiteUrl">
                 Website URL
@@ -319,7 +329,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-wrap gap-3">
             <button
               className="inline-flex items-center justify-center rounded-full bg-[#c35d2e] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#b65228] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/30 disabled:cursor-progress disabled:opacity-60"
               type="button"
@@ -343,7 +353,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <section className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
+        <section id="how-it-works" className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-5 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur scroll-mt-24">
           <div className="flex items-end justify-between gap-4 max-md:flex-col">
             <div>
               <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-900">How it works</h2>
@@ -351,7 +361,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
             {[
               {
                 step: "01",
@@ -378,7 +388,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
+        <section id="synced-profiles" className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-5 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur scroll-mt-24">
           <div className="flex items-end justify-between gap-4">
             <div>
               <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-900">Synced Profiles</h2>
@@ -387,15 +397,15 @@ export default function HomePage() {
           </div>
 
           {profilesLoading ? (
-            <div className="mt-5 grid gap-4">
+            <div className="mt-4 grid gap-4">
               <ProfileSkeleton />
               <ProfileSkeleton />
               <ProfileSkeleton />
             </div>
           ) : profiles.length === 0 ? (
-            <p className="mt-5 text-sm text-neutral-600">No synced profiles yet.</p>
+            <p className="mt-4 text-sm text-neutral-600">No synced profiles yet.</p>
           ) : (
-            <div className="mt-5 grid gap-4">
+            <div className="mt-4 grid gap-4">
               {profiles.map((profile) => (
                 <article
                   className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4 shadow-[0_16px_40px_rgba(98,69,39,0.12)]"
@@ -458,13 +468,13 @@ export default function HomePage() {
           )}
         </section>
 
-        <section className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
+        <section id="faq" className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-5 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur scroll-mt-24">
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-900">FAQ</h2>
             <p className="text-sm text-neutral-600">Common questions before the first sync.</p>
           </div>
 
-          <div className="mt-5 grid gap-3">
+          <div className="mt-4 grid gap-3">
             {[
               {
                 question: "Do I need to log in before using the app?",
@@ -489,6 +499,6 @@ export default function HomePage() {
           </div>
         </section>
       </section>
-    </main>
+    </WorkspaceShell>
   );
 }

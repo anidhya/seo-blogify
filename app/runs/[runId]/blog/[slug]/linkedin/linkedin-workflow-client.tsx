@@ -209,7 +209,7 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
   }
 
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-4">
       {visibleProgress ? (
         <WorkflowProgressBar
           progress={visibleProgress}
@@ -218,7 +218,7 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
         />
       ) : null}
 
-      <div className="rounded-[2rem] border border-black/10 bg-gradient-to-br from-[#f5f8ff] via-[#fffaf7] to-[#fff4eb] p-6 shadow-[0_24px_80px_rgba(90,71,51,0.14)]">
+      <div id="pack" className="rounded-[2rem] border border-black/10 bg-gradient-to-br from-[#f5f8ff] via-[#fffaf7] to-[#fff4eb] p-5 scroll-mt-24 shadow-[0_24px_80px_rgba(90,71,51,0.14)]">
         <div className="flex items-start justify-between gap-4 max-md:flex-col">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-[#8b5cf6]/15 bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#6d28d9]">
@@ -262,7 +262,7 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
       ) : (
         <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="grid gap-6">
-            <section className="rounded-[2rem] border border-black/10 bg-white/85 p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
+            <section id="title" className="rounded-[2rem] border border-black/10 bg-white/85 p-5 scroll-mt-24 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
               <div className="flex items-start justify-between gap-4 max-md:flex-col">
                 <div>
                   <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-950">Suggested post title</h2>
@@ -275,7 +275,7 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
               </div>
             </section>
 
-            <section className="rounded-[2rem] border border-black/10 bg-white/85 p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
+            <section id="description" className="rounded-[2rem] border border-black/10 bg-white/85 p-5 scroll-mt-24 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
               <div className="flex items-start justify-between gap-4 max-md:flex-col">
                 <div>
                   <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-950">Suggested description</h2>
@@ -298,7 +298,7 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
               </div>
             </section>
 
-            <section className="rounded-[2rem] border border-black/10 bg-white/85 p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
+            <section id="images" className="rounded-[2rem] border border-black/10 bg-white/85 p-5 scroll-mt-24 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
               <div className="flex items-start justify-between gap-4 max-md:flex-col">
                 <div>
                   <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-950">Carousel prompts</h2>
@@ -404,7 +404,7 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
           </div>
 
           <aside className="grid gap-6">
-            <section className="rounded-[2rem] border border-black/10 bg-gradient-to-br from-white via-[#fffaf2] to-[#eef7ff] p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
+            <section id="controls" className="rounded-[2rem] border border-black/10 bg-gradient-to-br from-white via-[#fffaf2] to-[#eef7ff] p-5 scroll-mt-24 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
               <div className="flex items-start justify-between gap-4 max-md:flex-col">
                 <div>
                   <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-950">Publish controls</h2>
@@ -511,7 +511,7 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
               </div>
             </section>
 
-            <section className="rounded-[2rem] border border-black/10 bg-white/85 p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
+            <section id="review" className="rounded-[2rem] border border-black/10 bg-white/85 p-5 scroll-mt-24 shadow-[0_20px_60px_rgba(98,69,39,0.12)]">
               <div className="flex items-start justify-between gap-4 max-md:flex-col">
                 <div>
                   <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-950">Approval history</h2>

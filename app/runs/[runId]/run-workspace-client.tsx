@@ -146,8 +146,8 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
   }
 
   return (
-    <section className="grid gap-6">
-      <div className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
+    <section className="grid gap-4">
+      <div className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-5 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
         <div className="flex items-start justify-between gap-4 max-md:flex-col">
           <div>
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-black/10 bg-white/60 px-4 py-2 text-sm text-neutral-600 backdrop-blur">
@@ -180,7 +180,7 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
       ) : null}
 
       {analysis ? (
-        <section className="rounded-[2rem] border border-black/10 bg-gradient-to-br from-[#fff4ea] via-[#fffaf4] to-[#eef7ff] p-6 shadow-[0_24px_80px_rgba(70,96,132,0.14)] backdrop-blur">
+        <section id="analysis" className="scroll-mt-24 rounded-[2rem] border border-black/10 bg-gradient-to-br from-[#fff4ea] via-[#fffaf4] to-[#eef7ff] p-5 shadow-[0_24px_80px_rgba(70,96,132,0.14)] backdrop-blur">
           <div className="flex items-start justify-between gap-4 max-md:flex-col">
             <div>
               <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/60 bg-white/70 px-4 py-2 text-sm text-neutral-700 shadow-sm">
@@ -228,14 +228,14 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">Audience</span>
             <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">Voice</span>
             <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">SEO</span>
             <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Coverage</span>
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div className="rounded-[1.5rem] border border-sky-200/70 bg-sky-50/90 p-4 shadow-[0_14px_40px_rgba(56,189,248,0.08)]">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-600">Audience</p>
               <p className="mt-2 text-sm leading-6 text-slate-700">{analysis.audience}</p>
@@ -279,7 +279,7 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
         </section>
       ) : null}
 
-      <section className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
+      <section id="topics" className="scroll-mt-24 rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-5 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
         <div className="flex items-end justify-between gap-4 max-md:flex-col max-md:items-start">
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-900">Topic Approval Queue</h2>
@@ -361,7 +361,7 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
         )}
       </section>
 
-      <section className="rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
+      <section id="articles" className="scroll-mt-24 rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-5 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
         <div className="flex items-end justify-between gap-4 max-md:flex-col max-md:items-start">
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-neutral-900">Approved Articles</h2>

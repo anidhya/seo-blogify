@@ -1,6 +1,7 @@
 import { loadRun } from "@/lib/storage";
 import { notFound } from "next/navigation";
 import LinkedInWorkflowClient from "./linkedin-workflow-client";
+import WorkspaceShell from "@/app/components/workspace-shell";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +24,17 @@ export default async function LinkedInPage({ params }: PageProps) {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-[min(1600px,80vw)] px-5 py-7 max-lg:max-w-full">
+    <WorkspaceShell
+      title="LinkedIn Pack"
+      subtitle="Generate carousel prompts, review images, and publish the approved post."
+      navItems={[
+        { label: "Pack", href: "#pack", icon: "articles", active: true, status: "complete" },
+        { label: "Images", href: "#images", icon: "preview", status: "complete" },
+        { label: "Controls", href: "#controls", icon: "analysis", status: "complete" },
+        { label: "Review", href: "#review", icon: "publish", status: "complete" }
+      ]}
+    >
       <LinkedInWorkflowClient runId={runId} slug={slug} run={run} />
-    </main>
+    </WorkspaceShell>
   );
 }

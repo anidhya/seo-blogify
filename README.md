@@ -25,11 +25,13 @@ Blogify is a Next.js app that turns a company website and supporting blog URLs i
 - `/runs/[runId]` workspace for analysis and topic approval
 - `/runs/[runId]/blog/[slug]` article preview, regeneration, and approval flow
 - `/runs/[runId]/blog/[slug]/linkedin` LinkedIn publishing workflow for the approved article
+- The app uses a compact left navigation rail with icons and a shared workspace shell across the main screens
 
 ## UI stack
 
 - Next.js App Router
 - Tailwind CSS
+- Shared workspace shell with a slim icon-first navigation rail
 - Route-level loading states
 - Local file-backed workflow storage under `data/runs/<runId>/`
 
@@ -97,6 +99,7 @@ Key files:
 
 ## Notes
 
+- The design system lives in [`design.md`](/Users/anidhyaahuja/Documents/blogify/design.md). Update it whenever a new UI decision is made.
 - The app fetches the provided website and blog URLs directly and extracts text heuristically.
 - Topic suggestions are deduplicated against existing blog coverage before they are shown for approval.
 - The generated blog body is capped at 1200 words.
@@ -104,5 +107,6 @@ Key files:
 - Approving a blog can generate a LinkedIn publishing pack with 4 carousel-ready prompts, then hand off to the LinkedIn workflow page.
 - The LinkedIn workflow page can generate 4 carousel images with Google AI Studio and render them on the same page.
 - LinkedIn publish state is stored per article slug inside `linkedin.json`.
+- The landing page, workspace, preview, and LinkedIn pages all share the same compact shell so the UI stays short and navigable.
 - The current storage layer is local filesystem-based, which is fine for development but not durable on Vercel serverless. For production on Vercel, swap `lib/storage.ts` to persistent storage such as Vercel Blob, Postgres, or KV.
 - CMS publishing is not wired yet. The output is generated as publication-ready markdown for the next handoff step.

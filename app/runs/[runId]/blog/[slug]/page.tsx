@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import BlogActions from "./blog-actions";
 import CopyButton from "./copy-button";
 import EditableArticleCard from "./editable-article-card";
+import WorkspaceShell from "@/app/components/workspace-shell";
 
 export const dynamic = "force-dynamic";
 
@@ -33,8 +34,29 @@ export default async function BlogPreviewPage({ params }: PageProps) {
   const latestApproval = approvals[approvals.length - 1];
 
   return (
-    <main className="mx-auto min-h-screen max-w-[min(1600px,80vw)] px-5 py-7 max-lg:max-w-full">
-      <section className="grid gap-6 rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-6 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
+    <WorkspaceShell
+      title="Article Preview"
+      subtitle={blog.title}
+      topAction={
+        latestApproval?.approved ? (
+          <a
+            className="inline-flex items-center justify-center rounded-full border border-[#8b5cf6]/20 bg-[#f5f3ff] px-4 py-2 text-sm font-medium text-[#6d28d9] transition hover:-translate-y-0.5 hover:bg-[#ede9fe] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/25"
+            href={`/runs/${runId}/blog/${slug}/linkedin`}
+          >
+            Open LinkedIn workflow
+          </a>
+        ) : null
+      }
+      navItems={[
+        { label: "Article", href: "#article", icon: "preview", active: true, status: quality?.publishStatus === "publish_ready" ? "complete" : "needs_review" },
+        { label: "SEO", href: "#seo", icon: "analysis", status: "complete" },
+        { label: "Takeaways", href: "#takeaways", icon: "topics", status: "complete" },
+        { label: "History", href: "#history", icon: "publish", status: latestApproval ? "complete" : "idle" },
+        { label: "Images", href: "#images", icon: "articles", status: "complete" },
+        { label: "Links", href: "#links", icon: "sync", status: "complete" }
+      ]}
+    >
+      <section className="grid gap-4 rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-5 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
         <div>
           <div className="inline-flex w-fit items-center gap-2 rounded-full border border-black/10 bg-white/60 px-4 py-2 text-sm text-neutral-600 backdrop-blur">
             <span className="h-2.5 w-2.5 rounded-full bg-[#c35d2e]" />
@@ -45,33 +67,25 @@ export default async function BlogPreviewPage({ params }: PageProps) {
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-            <div className="grid gap-4 rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
+            <div id="article" className="grid gap-4 rounded-3xl border border-black/10 bg-[#fffaf2] p-4 scroll-mt-24">
               <div className="flex items-start justify-between gap-4 max-md:flex-col">
                 <div>
                   <h2 className="text-lg font-semibold text-neutral-900">Article status</h2>
-                <div className="mt-3 grid gap-1 text-sm text-neutral-600">
-                  <p>Publish status: {quality?.publishStatus ?? "draft"}</p>
-                  <p>Quality score: {quality?.score ?? "n/a"}</p>
-                  <p>Word count: {approvedArticle?.wordCount ?? run.blog?.wordCount ?? "n/a"}</p>
-                  <p>Run ID: {runId}</p>
-                  <p>Workflow status: {manifest?.status ?? "unknown"}</p>
-                  <p>Approval state: {latestApproval ? latestApproval.publishStatus : "pending"}</p>
-                </div>
+                  <div className="mt-3 grid gap-1 text-sm text-neutral-600">
+                    <p>Publish status: {quality?.publishStatus ?? "draft"}</p>
+                    <p>Quality score: {quality?.score ?? "n/a"}</p>
+                    <p>Word count: {approvedArticle?.wordCount ?? run.blog?.wordCount ?? "n/a"}</p>
+                    <p>Run ID: {runId}</p>
+                    <p>Workflow status: {manifest?.status ?? "unknown"}</p>
+                    <p>Approval state: {latestApproval ? latestApproval.publishStatus : "pending"}</p>
+                  </div>
                 </div>
               </div>
               <BlogActions runId={runId} slug={slug} canApprove={canApprove} />
-              {latestApproval?.approved ? (
-                <a
-                  className="inline-flex w-fit items-center justify-center rounded-full border border-[#8b5cf6]/20 bg-[#f5f3ff] px-4 py-2 text-sm font-medium text-[#6d28d9] transition hover:-translate-y-0.5 hover:bg-[#ede9fe] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/25"
-                  href={`/runs/${runId}/blog/${slug}/linkedin`}
-                >
-                  Open LinkedIn workflow
-                </a>
-              ) : null}
             </div>
 
           <div className="grid gap-4">
-            <div className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
+            <div id="seo" className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4 scroll-mt-24">
               <div className="flex items-start justify-between gap-4 max-md:flex-col">
                 <div>
                   <h2 className="text-lg font-semibold text-neutral-900">SEO Meta</h2>
@@ -99,7 +113,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
+            <div id="takeaways" className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4 scroll-mt-24">
               <div className="flex items-start justify-between gap-4 max-md:flex-col">
                 <div>
                   <h2 className="text-lg font-semibold text-neutral-900">Key Takeaways</h2>
@@ -119,7 +133,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
+          <div id="history" className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4 scroll-mt-24">
             <div className="flex items-start justify-between gap-4 max-md:flex-col">
               <div>
                 <h2 className="text-lg font-semibold text-neutral-900">Approval history</h2>
@@ -152,7 +166,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
+          <div id="images" className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4 scroll-mt-24">
             <div className="flex items-start justify-between gap-4 max-md:flex-col">
               <div>
                 <h2 className="text-lg font-semibold text-neutral-900">Regeneration History</h2>
@@ -191,7 +205,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
+          <div id="links" className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4 scroll-mt-24">
             <div className="flex items-start justify-between gap-4 max-md:flex-col">
               <div>
                 <h2 className="text-lg font-semibold text-neutral-900">Image Prompts</h2>
@@ -273,6 +287,6 @@ export default async function BlogPreviewPage({ params }: PageProps) {
           </div>
         </article>
       </section>
-    </main>
+    </WorkspaceShell>
   );
 }
