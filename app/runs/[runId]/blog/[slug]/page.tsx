@@ -1,4 +1,5 @@
 import { loadRun } from "@/lib/storage";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import BlogActions from "./blog-actions";
 import CopyButton from "./copy-button";
@@ -33,19 +34,70 @@ export default async function BlogPreviewPage({ params }: PageProps) {
   const canApprove = quality?.publishStatus === "publish_ready";
   const latestApproval = approvals[approvals.length - 1];
 
+  function DisclosureCard({
+    id,
+    title,
+    description,
+    copyLabel,
+    copyText,
+    children,
+    defaultOpen = false
+  }: {
+    id: string;
+    title: string;
+    description?: string;
+    copyLabel?: string;
+    copyText?: string;
+    children: ReactNode;
+    defaultOpen?: boolean;
+  }) {
+    return (
+      <details className="rounded-[12px] border border-black/10 bg-white/85 shadow-[0_10px_24px_rgba(15,23,42,0.04)] transition open:shadow-[0_16px_32px_rgba(15,23,42,0.07)] dark:border-white/8 dark:bg-white/5" open={defaultOpen} id={id}>
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-3 rounded-[12px] px-4 py-3 text-left [&::-webkit-details-marker]:hidden">
+          <div>
+            <h2 className="text-sm font-semibold text-neutral-900 dark:text-zinc-50">{title}</h2>
+            {description ? <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-zinc-400">{description}</p> : null}
+          </div>
+          <div className="flex items-center gap-2">
+            {copyLabel && copyText ? <CopyButton label={copyLabel} text={copyText} /> : null}
+            <span className="mt-0.5 rounded-full border border-black/10 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500 dark:border-white/10 dark:bg-white/5 dark:text-zinc-400">
+              Expand
+            </span>
+          </div>
+        </summary>
+        <div className="border-t border-black/10 px-4 py-4 dark:border-white/8">{children}</div>
+      </details>
+    );
+  }
+
   return (
     <WorkspaceShell
       title="Article Preview"
       subtitle={blog.title}
+      backHref={`/runs/${runId}`}
+      backLabel="Workspace"
+      breadcrumbs={[
+        { label: "Sync", href: "/" },
+        { label: "Workspace", href: `/runs/${runId}` },
+        { label: "Article", active: true }
+      ]}
       topAction={
-        latestApproval?.approved ? (
+        <div className="flex flex-wrap items-center gap-2">
           <a
-            className="inline-flex items-center justify-center rounded-full border border-[#8b5cf6]/20 bg-[#f5f3ff] px-4 py-2 text-sm font-medium text-[#6d28d9] transition hover:-translate-y-0.5 hover:bg-[#ede9fe] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/25"
-            href={`/runs/${runId}/blog/${slug}/linkedin`}
+            className="inline-flex items-center justify-center rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25"
+            href={`/runs/${runId}`}
           >
-            Open LinkedIn workflow
+            Back to workspace
           </a>
-        ) : null
+          {latestApproval?.approved ? (
+            <a
+              className="inline-flex items-center justify-center rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:text-[#86efac]"
+              href={`/runs/${runId}/blog/${slug}/linkedin`}
+            >
+              Open LinkedIn workflow
+            </a>
+          ) : null}
+        </div>
       }
       navItems={[
         { label: "Article", href: "#article", icon: "preview", active: true, status: quality?.publishStatus === "publish_ready" ? "complete" : "needs_review" },
@@ -53,239 +105,179 @@ export default async function BlogPreviewPage({ params }: PageProps) {
         { label: "Takeaways", href: "#takeaways", icon: "topics", status: "complete" },
         { label: "History", href: "#history", icon: "publish", status: latestApproval ? "complete" : "idle" },
         { label: "Images", href: "#images", icon: "articles", status: "complete" },
-        { label: "Links", href: "#links", icon: "sync", status: "complete" }
+        { label: "Links", href: "#links", icon: "sync", status: "complete" },
+        { label: "FAQs", href: "#faqs", icon: "topics", status: "complete" }
       ]}
     >
-      <section className="grid gap-4 rounded-[2rem] border border-black/10 bg-[rgba(255,252,247,0.92)] p-5 shadow-[0_20px_60px_rgba(98,69,39,0.12)] backdrop-blur">
-        <div>
-          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-black/10 bg-white/60 px-4 py-2 text-sm text-neutral-600 backdrop-blur">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#c35d2e]" />
-            Blog preview
+      <section className="surface-shell grid gap-4 p-4">
+        <div className="rounded-[12px] border border-white/8 bg-white/82 p-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)] dark:bg-white/5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500 dark:border-white/10 dark:bg-white/5 dark:text-zinc-400">
+                Blog preview
+              </div>
+              <h1 className="mt-3 max-w-4xl font-display text-3xl tracking-[-0.04em] text-neutral-900 md:text-4xl dark:text-zinc-50">{blog.title}</h1>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-neutral-600 md:text-[15px] dark:text-zinc-400">{blog.summary}</p>
+            </div>
+            <div className="grid gap-2 text-xs text-neutral-500 dark:text-zinc-400">
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1 font-medium text-neutral-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200">
+                  {quality?.publishStatus ?? "draft"}
+                </span>
+                <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1 font-medium text-neutral-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200">
+                  Score {quality?.score ?? "n/a"}
+                </span>
+                <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1 font-medium text-neutral-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200">
+                  {approvedArticle?.wordCount ?? run.blog?.wordCount ?? "n/a"} words
+                </span>
+              </div>
+              <p>Run ID: {runId}</p>
+              <p>Approval: {latestApproval ? latestApproval.publishStatus : "pending"}</p>
+            </div>
           </div>
-          <h1 className="mt-3 font-serif text-4xl tracking-[-0.04em] text-neutral-900 md:text-6xl">{blog.title}</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-neutral-600 md:text-base">{blog.summary}</p>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-            <div id="article" className="grid gap-4 rounded-3xl border border-black/10 bg-[#fffaf2] p-4 scroll-mt-24">
-              <div className="flex items-start justify-between gap-4 max-md:flex-col">
-                <div>
-                  <h2 className="text-lg font-semibold text-neutral-900">Article status</h2>
-                  <div className="mt-3 grid gap-1 text-sm text-neutral-600">
-                    <p>Publish status: {quality?.publishStatus ?? "draft"}</p>
-                    <p>Quality score: {quality?.score ?? "n/a"}</p>
-                    <p>Word count: {approvedArticle?.wordCount ?? run.blog?.wordCount ?? "n/a"}</p>
-                    <p>Run ID: {runId}</p>
-                    <p>Workflow status: {manifest?.status ?? "unknown"}</p>
-                    <p>Approval state: {latestApproval ? latestApproval.publishStatus : "pending"}</p>
-                  </div>
-                </div>
-              </div>
-              <BlogActions runId={runId} slug={slug} canApprove={canApprove} />
-            </div>
-
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_360px]">
           <div className="grid gap-4">
-            <div id="seo" className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4 scroll-mt-24">
-              <div className="flex items-start justify-between gap-4 max-md:flex-col">
-                <div>
-                  <h2 className="text-lg font-semibold text-neutral-900">SEO Meta</h2>
-                  <p className="mt-1 text-sm text-neutral-600">Copy this block or reuse it in the CMS.</p>
-                </div>
-                <CopyButton
-                  label="Copy meta"
-                  text={`Title: ${blog.meta.title}\nDescription: ${blog.meta.description}\nKeywords: ${blog.meta.keywords.join(", ")}`}
-                />
-              </div>
-              <div className="mt-3 grid gap-2 text-sm text-neutral-600">
+            <EditableArticleCard runId={runId} articleSlug={slug} markdown={blog.markdown} />
+          </div>
+
+          <aside className="grid gap-4 xl:sticky xl:top-4 self-start">
+            <BlogActions runId={runId} slug={slug} canApprove={canApprove} />
+
+            <DisclosureCard
+              id="seo"
+              title="SEO Meta"
+              description="Compact metadata block for CMS reuse."
+              copyLabel="Copy meta"
+              copyText={`Title: ${blog.meta.title}\nDescription: ${blog.meta.description}\nKeywords: ${blog.meta.keywords.join(", ")}`}
+            >
+              <div className="grid gap-2 text-sm text-neutral-600 dark:text-zinc-400">
                 <p>
-                  <strong className="text-neutral-900">Title:</strong> {blog.meta.title}
+                  <strong className="text-neutral-900 dark:text-zinc-50">Title:</strong> {blog.meta.title}
                 </p>
                 <p>
-                  <strong className="text-neutral-900">Description:</strong> {blog.meta.description}
+                  <strong className="text-neutral-900 dark:text-zinc-50">Description:</strong> {blog.meta.description}
                 </p>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {blog.meta.keywords.map((keyword) => (
-                  <span className="rounded-full bg-[#f2d1c3] px-3 py-1 text-xs font-medium text-[#7e3614]" key={keyword}>
+                  <span className="rounded-full bg-[#0f7b49]/10 px-3 py-1 text-xs font-medium text-[#0f7b49] dark:bg-white/10 dark:text-[#86efac]" key={keyword}>
                     {keyword}
                   </span>
                 ))}
               </div>
-            </div>
+            </DisclosureCard>
 
-            <div id="takeaways" className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4 scroll-mt-24">
-              <div className="flex items-start justify-between gap-4 max-md:flex-col">
-                <div>
-                  <h2 className="text-lg font-semibold text-neutral-900">Key Takeaways</h2>
-                  <p className="mt-1 text-sm text-neutral-600">Copy the core points as a quick export note.</p>
-                </div>
-                <CopyButton label="Copy takeaways" text={blog.keyTakeaways.join("\n")} />
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
+            <DisclosureCard
+              id="takeaways"
+              title="Key Takeaways"
+              description="Core points in compact form."
+              copyLabel="Copy takeaways"
+              copyText={blog.keyTakeaways.join("\n")}
+            >
+              <div className="flex flex-wrap gap-2">
                 {blog.keyTakeaways.map((takeaway) => (
-                  <span className="rounded-full bg-[#f2d1c3] px-3 py-1 text-xs font-medium text-[#7e3614]" key={takeaway}>
+                  <span className="rounded-full bg-[#0f7b49]/10 px-3 py-1 text-xs font-medium text-[#0f7b49] dark:bg-white/10 dark:text-[#86efac]" key={takeaway}>
                     {takeaway}
                   </span>
                 ))}
               </div>
-            </div>
-          </div>
-        </div>
+            </DisclosureCard>
 
-        <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-          <div id="history" className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4 scroll-mt-24">
-            <div className="flex items-start justify-between gap-4 max-md:flex-col">
-              <div>
-                <h2 className="text-lg font-semibold text-neutral-900">Approval history</h2>
+            <DisclosureCard
+              id="images"
+              title="Image Prompts"
+              description="Three consistent prompts for later image generation."
+              copyLabel="Copy prompts"
+              copyText={blog.imagePrompts.join("\n\n")}
+            >
+              <div className="grid gap-3">
+                {blog.imagePrompts.map((prompt, index) => (
+                  <div key={`${index}-${prompt}`} className="rounded-[12px] border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-white/5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500 dark:text-zinc-400">Prompt {index + 1}</p>
+                    <p className="mt-2 text-sm leading-6 text-neutral-700 dark:text-zinc-300">{prompt || "n/a"}</p>
+                  </div>
+                ))}
               </div>
-              <CopyButton
-                label="Copy approvals"
-                text={approvals
-                  .map(
-                    (approval) =>
-                      `${approval.approved ? "Approved" : "Needs revision"} | ${approval.notes || "n/a"} | ${approval.score ?? "n/a"}`
-                  )
-                  .join("\n")}
-              />
-            </div>
-            {approvals.length === 0 ? <p className="mt-3 text-sm text-neutral-600">No approval decisions yet.</p> : null}
-            <div className="mt-3 grid gap-3">
-              {approvals.map((approval) => (
-                <div key={approval.approvalId} className="rounded-2xl border border-black/10 bg-white/80 p-3">
-                  <p className="text-sm text-neutral-600">
-                    <strong className="text-neutral-900">Decision:</strong> {approval.approved ? "Approved" : "Needs revision"}
-                  </p>
-                  <p className="mt-1 text-sm text-neutral-600">
-                    <strong className="text-neutral-900">Notes:</strong> {approval.notes || "n/a"}
-                  </p>
-                  <p className="mt-1 text-sm text-neutral-600">
-                    <strong className="text-neutral-900">Quality score:</strong> {approval.score ?? "n/a"}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
+            </DisclosureCard>
 
-          <div id="images" className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4 scroll-mt-24">
-            <div className="flex items-start justify-between gap-4 max-md:flex-col">
-              <div>
-                <h2 className="text-lg font-semibold text-neutral-900">Regeneration History</h2>
+            <DisclosureCard
+              id="links"
+              title="Internal Link Suggestions"
+              description="SEO-oriented anchors for strengthening site structure."
+              copyLabel="Copy links"
+              copyText={blog.internalLinks
+                .map((link) => `${link.anchorText} -> ${link.targetUrl}\nPlacement: ${link.placement}\nWhy: ${link.rationale}`)
+                .join("\n\n")}
+            >
+              <div className="grid gap-3">
+                {blog.internalLinks.length === 0 ? (
+                  <p className="text-sm text-neutral-600 dark:text-zinc-400">No link suggestions generated.</p>
+                ) : (
+                  blog.internalLinks.map((link) => (
+                    <div key={`${link.anchorText}-${link.targetUrl}`} className="rounded-[12px] border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-white/5">
+                      <p className="text-sm text-neutral-600 dark:text-zinc-400">
+                        <strong className="text-neutral-900 dark:text-zinc-50">Anchor:</strong> {link.anchorText}
+                      </p>
+                      <p className="mt-1 text-sm text-neutral-600 dark:text-zinc-400">
+                        <strong className="text-neutral-900 dark:text-zinc-50">Target:</strong> {link.targetUrl}
+                      </p>
+                      <p className="mt-1 text-sm text-neutral-600 dark:text-zinc-400">
+                        <strong className="text-neutral-900 dark:text-zinc-50">Placement:</strong> {link.placement}
+                      </p>
+                      <p className="mt-1 text-sm text-neutral-600 dark:text-zinc-400">
+                        <strong className="text-neutral-900 dark:text-zinc-50">Why:</strong> {link.rationale}
+                      </p>
+                    </div>
+                  ))
+                )}
               </div>
-              <CopyButton
-                label="Copy history"
-                text={notes
-                  .map(
-                    (note) =>
-                      `${note.comments}\nPrior: ${note.priorScore ?? "n/a"}\nResult: ${note.resultingScore ?? "n/a"}\nStatus: ${note.publishStatus}`
-                  )
-                  .join("\n\n")}
-              />
-            </div>
-            {notes.length === 0 ? <p className="mt-3 text-sm text-neutral-600">No regeneration notes yet.</p> : null}
-            <div className="mt-3 grid gap-3">
-              {notes.map((note) => (
-                <div key={note.revisionId} className="rounded-2xl border border-black/10 bg-white/80 p-3">
-                  <p className="text-sm text-neutral-600">
-                    <strong className="text-neutral-900">Comments:</strong> {note.comments}
-                  </p>
-                  <p className="mt-1 text-sm text-neutral-600">
-                    <strong className="text-neutral-900">Prior score:</strong> {note.priorScore ?? "n/a"}
-                  </p>
-                  <p className="mt-1 text-sm text-neutral-600">
-                    <strong className="text-neutral-900">Resulting score:</strong> {note.resultingScore ?? "n/a"}
-                  </p>
-                  <p className="mt-1 text-sm text-neutral-600">
-                    <strong className="text-neutral-900">Status:</strong> {note.publishStatus}
-                  </p>
-                </div>
-              ))}
-            </div>
-            {revisions.length > 0 ? <p className="mt-3 text-sm text-neutral-500">Saved revisions: {revisions.length}</p> : null}
-          </div>
-        </div>
+            </DisclosureCard>
 
-        <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-          <div id="links" className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4 scroll-mt-24">
-            <div className="flex items-start justify-between gap-4 max-md:flex-col">
-              <div>
-                <h2 className="text-lg font-semibold text-neutral-900">Image Prompts</h2>
-                <p className="mt-1 text-sm text-neutral-600">Three consistent prompts for later image generation in Nano Banana Pro.</p>
-              </div>
-              <CopyButton label="Copy prompts" text={blog.imagePrompts.join("\n\n")} />
-            </div>
-            <div className="mt-3 grid gap-3">
-              {blog.imagePrompts.map((prompt, index) => (
-                <div key={`${index}-${prompt}`} className="rounded-2xl border border-black/10 bg-white/80 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Prompt {index + 1}</p>
-                  <p className="mt-2 text-sm leading-6 text-neutral-700">{prompt || "n/a"}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
-            <div className="flex items-start justify-between gap-4 max-md:flex-col">
-              <div>
-                <h2 className="text-lg font-semibold text-neutral-900">Internal Link Suggestions</h2>
-                <p className="mt-1 text-sm text-neutral-600">SEO-oriented anchors for strengthening site structure.</p>
-              </div>
-              <CopyButton
-                label="Copy links"
-                text={blog.internalLinks
-                  .map(
-                    (link) =>
-                      `${link.anchorText} -> ${link.targetUrl}\nPlacement: ${link.placement}\nWhy: ${link.rationale}`
-                  )
-                  .join("\n\n")}
-              />
-            </div>
-            <div className="mt-3 grid gap-3">
-              {blog.internalLinks.length === 0 ? (
-                <p className="text-sm text-neutral-600">No link suggestions generated.</p>
-              ) : (
-                blog.internalLinks.map((link) => (
-                  <div key={`${link.anchorText}-${link.targetUrl}`} className="rounded-2xl border border-black/10 bg-white/80 p-3">
-                    <p className="text-sm text-neutral-700">
-                      <strong className="text-neutral-900">Anchor:</strong> {link.anchorText}
+            <DisclosureCard
+              id="history"
+              title="Approval History"
+              description="Latest decisions and review notes."
+              copyLabel="Copy approvals"
+              copyText={approvals.map((approval) => `${approval.approved ? "Approved" : "Needs revision"} | ${approval.notes || "n/a"} | ${approval.score ?? "n/a"}`).join("\n")}
+            >
+              <div className="grid gap-3">
+                {approvals.length === 0 ? <p className="text-sm text-neutral-600 dark:text-zinc-400">No approval decisions yet.</p> : null}
+                {approvals.map((approval) => (
+                  <div key={approval.approvalId} className="rounded-[12px] border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-white/5">
+                    <p className="text-sm text-neutral-600 dark:text-zinc-400">
+                      <strong className="text-neutral-900 dark:text-zinc-50">Decision:</strong> {approval.approved ? "Approved" : "Needs revision"}
                     </p>
-                    <p className="mt-1 text-sm text-neutral-700">
-                      <strong className="text-neutral-900">Target:</strong> {link.targetUrl}
+                    <p className="mt-1 text-sm text-neutral-600 dark:text-zinc-400">
+                      <strong className="text-neutral-900 dark:text-zinc-50">Notes:</strong> {approval.notes || "n/a"}
                     </p>
-                    <p className="mt-1 text-sm text-neutral-700">
-                      <strong className="text-neutral-900">Placement:</strong> {link.placement}
-                    </p>
-                    <p className="mt-1 text-sm text-neutral-700">
-                      <strong className="text-neutral-900">Why:</strong> {link.rationale}
+                    <p className="mt-1 text-sm text-neutral-600 dark:text-zinc-400">
+                      <strong className="text-neutral-900 dark:text-zinc-50">Quality score:</strong> {approval.score ?? "n/a"}
                     </p>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        <EditableArticleCard runId={runId} articleSlug={slug} markdown={blog.markdown} />
-
-        <article className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
-          <div className="flex items-start justify-between gap-4 max-md:flex-col">
-            <div>
-              <h2 className="text-lg font-semibold text-neutral-900">FAQs</h2>
-              <p className="mt-1 text-sm text-neutral-600">Frequently asked questions included in the article.</p>
-            </div>
-            <CopyButton
-              label="Copy FAQs"
-              text={blog.faqs.map((faq) => `Q: ${faq.question}\nA: ${faq.answer}`).join("\n\n")}
-            />
-          </div>
-          <div className="mt-4 grid gap-4">
-            {blog.faqs.map((faq) => (
-              <div key={faq.question} className="rounded-2xl border border-black/10 bg-white/80 p-4">
-                <strong className="block text-sm text-neutral-900">{faq.question}</strong>
-                <p className="mt-2 text-sm leading-6 text-neutral-600">{faq.answer}</p>
+                ))}
               </div>
-            ))}
-          </div>
-        </article>
+            </DisclosureCard>
+
+            <DisclosureCard
+              id="faqs"
+              title="FAQs"
+              description="Frequently asked questions included in the article."
+              copyLabel="Copy FAQs"
+              copyText={blog.faqs.map((faq) => `Q: ${faq.question}\nA: ${faq.answer}`).join("\n\n")}
+            >
+              <div className="grid gap-3">
+                {blog.faqs.map((faq) => (
+                  <div key={faq.question} className="rounded-[12px] border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-white/5">
+                    <strong className="block text-sm text-neutral-900 dark:text-zinc-50">{faq.question}</strong>
+                    <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-zinc-400">{faq.answer}</p>
+                  </div>
+                ))}
+              </div>
+            </DisclosureCard>
+          </aside>
+        </div>
       </section>
     </WorkspaceShell>
   );

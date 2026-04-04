@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   approvedArticleSchema,
@@ -829,6 +829,23 @@ export async function deleteLinkedInOAuthState(state: string) {
   const next = { states: current.states.filter((entry) => entry.state !== state) };
   await writeLinkedInJson("oauth-states.json", next);
   return next;
+}
+
+export async function deleteLinkedInOAuthStatesForRun(runId: string) {
+  const current = await readLinkedInJson<{ states: LinkedInOAuthState[] }>("oauth-states.json");
+  if (!current) {
+    return null;
+  }
+
+  const next = { states: current.states.filter((entry) => entry.runId !== runId) };
+  await writeLinkedInJson("oauth-states.json", next);
+  return next;
+}
+
+export async function deleteRun(runId: string) {
+  await deleteLinkedInOAuthStatesForRun(runId);
+  await rm(runDir(runId), { recursive: true, force: true });
+  return true;
 }
 
 export async function listRunSummaries(): Promise<RunSummary[]> {

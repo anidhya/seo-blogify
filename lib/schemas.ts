@@ -138,12 +138,19 @@ export const linkedInGeneratedImageSchema = z.object({
   providerResponseText: z.string().nullable().default(null)
 });
 
+export const linkedInSlideFailureSchema = z.object({
+  slideNumber: z.number(),
+  reason: z.string(),
+  failedAt: z.string()
+});
+
 const linkedInDraftSchemaCurrent = z.object({
   articleSlug: z.string(),
   suggestedTitle: z.string(),
   suggestedDescription: z.string(),
   carouselPrompts: z.array(linkedInCarouselPromptSchema).length(4),
   generatedImages: z.array(linkedInGeneratedImageSchema).default([]),
+  failedSlides: z.array(linkedInSlideFailureSchema).default([]),
   imageGenerationStatus: z.enum(["idle", "pending", "queued", "generating", "partial", "ready", "failed"]).default("idle"),
   imageModel: z.string().nullable().default(null),
   hashtags: z.array(z.string()).min(3).max(10),
@@ -158,6 +165,7 @@ const linkedInDraftSchemaLegacy = z.object({
   caption: z.string(),
   carouselPrompts: z.array(linkedInCarouselPromptSchema).length(4),
   generatedImages: z.array(linkedInGeneratedImageSchema).default([]),
+  failedSlides: z.array(linkedInSlideFailureSchema).default([]),
   imageGenerationStatus: z.enum(["idle", "pending", "queued", "generating", "partial", "ready", "failed"]).default("idle"),
   imageModel: z.string().nullable().default(null),
   hashtags: z.array(z.string()).min(3).max(10),

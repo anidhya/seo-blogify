@@ -27,6 +27,15 @@ export default async function LinkedInPage({ params }: PageProps) {
     <WorkspaceShell
       title="LinkedIn Pack"
       subtitle="Generate carousel prompts, review images, and publish the approved post."
+      backHref={`/runs/${runId}/blog/${slug}`}
+      backLabel="Article"
+      breadcrumbs={[
+        { label: "Sync", href: "/" },
+        { label: "Workspace", href: `/runs/${runId}` },
+        { label: "Article", href: `/runs/${runId}/blog/${slug}` },
+        { label: "LinkedIn", active: true }
+      ]}
+      topAction={null}
       navItems={[
         { label: "Pack", href: "#pack", icon: "articles", active: true, status: "complete" },
         { label: "Images", href: "#images", icon: "preview", status: "complete" },

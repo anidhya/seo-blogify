@@ -57,6 +57,7 @@ type RequestBody = {
   step: WorkflowStep;
   runId?: string;
   articleSlug?: string;
+  slideNumber?: number;
   comments?: string;
   approved?: boolean;
   markdown?: string;
@@ -187,6 +188,7 @@ function buildFallbackLinkedInDraft(params: {
       }
     ],
     generatedImages: [],
+    failedSlides: [],
     imageGenerationStatus: "idle",
     imageModel: null,
     hashtags: [focus, params.topic.seoAngle, "LinkedInMarketing", "ContentStrategy"].map((item) =>
@@ -250,6 +252,7 @@ async function generateLinkedInDraftForRun(params: {
 async function queueLinkedInImagesForArticle(params: {
   runId: string;
   articleSlug: string;
+  slideNumber?: number;
 }) {
   const run = await loadRun(params.runId);
   const linkedInRecord = getLinkedInArticleRecord(run, params.articleSlug);
@@ -259,32 +262,70 @@ async function queueLinkedInImagesForArticle(params: {
     throw new Error("LinkedIn draft is not available.");
   }
 
-  await setProgress(params.runId, "queue-linkedin-images", 5, "Queued for Google image generation");
+  const existingImages = draft.generatedImages ?? [];
+  const slideNumber = typeof params.slideNumber === "number" ? params.slideNumber : null;
+  const baseImages = slideNumber
+    ? existingImages.filter((image) => image.slideNumber !== slideNumber)
+    : [];
+
+  await setProgress(
+    params.runId,
+    "queue-linkedin-images",
+    5,
+    slideNumber ? `Queued slide ${slideNumber} for Google image generation` : "Queued carousel images for Google image generation"
+  );
   const queuedDraft: LinkedInDraft = {
     ...draft,
     imageGenerationStatus: "queued",
-    generatedImages: draft.generatedImages ?? [],
+    generatedImages: slideNumber ? baseImages : [],
+    failedSlides: slideNumber
+      ? (draft.failedSlides ?? []).filter((failure) => failure.slideNumber !== slideNumber)
+      : [],
     imageModel: draft.imageModel ?? null
   };
   await saveLinkedInDraft(params.runId, queuedDraft);
 
-  const generatedImagesInProgress: LinkedInGeneratedImage[] = [];
-  await setProgress(params.runId, "queue-linkedin-images", 18, "Starting first slide");
+  let generatedImagesInProgress: LinkedInGeneratedImage[] = [...baseImages];
+  await setProgress(
+    params.runId,
+    "queue-linkedin-images",
+    18,
+    slideNumber ? `Starting slide ${slideNumber}` : "Starting first slide"
+  );
 
   try {
     const generatedImages = await generateLinkedInCarouselImages({
       draft: queuedDraft,
+      slideNumber: slideNumber ?? undefined,
       retriesPerSlide: 4,
       baseDelayMs: 1500,
-      onSlideGenerated: async ({ slideNumber, generatedCount, total, image, model }) => {
-        generatedImagesInProgress.push(image);
+      onSlideGenerated: async ({ slideNumber: generatedSlideNumber, generatedCount, total, image, model }) => {
+        generatedImagesInProgress = [
+          ...generatedImagesInProgress.filter((existing) => existing.slideNumber !== generatedSlideNumber),
+          image
+        ].sort((left, right) => left.slideNumber - right.slideNumber);
+        const failedSlides = (queuedDraft.failedSlides ?? []).filter(
+          (failure) => failure.slideNumber !== generatedSlideNumber
+        );
         const percent = 18 + Math.round((generatedCount / total) * 72);
-        await setProgress(params.runId, "queue-linkedin-images", percent, `Generating slide ${slideNumber}`);
+        await setProgress(
+          params.runId,
+          "queue-linkedin-images",
+          percent,
+          `Generating slide ${generatedSlideNumber}`
+        );
         await saveLinkedInDraft(params.runId, {
           ...queuedDraft,
-          generatedImages: [...generatedImagesInProgress].sort((left, right) => left.slideNumber - right.slideNumber),
+          generatedImages: generatedImagesInProgress,
+          failedSlides,
           imageGenerationStatus:
-            generatedCount < total ? "generating" : "ready",
+            slideNumber
+              ? generatedImagesInProgress.length >= draft.carouselPrompts.length
+                ? "ready"
+                : "partial"
+              : generatedCount < total
+                ? "generating"
+                : "ready",
           imageModel: model
         });
       }
@@ -292,8 +333,11 @@ async function queueLinkedInImagesForArticle(params: {
 
     const enrichedDraft: LinkedInDraft = {
       ...queuedDraft,
-      generatedImages,
-      imageGenerationStatus: generatedImages.length === 4 ? "ready" : "partial",
+      generatedImages: slideNumber ? generatedImagesInProgress : generatedImages,
+      imageGenerationStatus:
+        (slideNumber ? generatedImagesInProgress : generatedImages).length === draft.carouselPrompts.length
+          ? "ready"
+          : "partial",
       imageModel: generatedImages[0]?.model ?? process.env.GOOGLE_IMAGE_MODEL ?? "gemini-2.5-flash-image"
     };
 
@@ -304,10 +348,22 @@ async function queueLinkedInImagesForArticle(params: {
 
     return enrichedDraft;
   } catch (error) {
-    const partialStatus = generatedImagesInProgress.length > 0 ? "partial" : "failed";
+    const partialStatus = generatedImagesInProgress.length > baseImages.length ? "partial" : "failed";
+    const failedSlideNumber = slideNumber;
     const partialDraft: LinkedInDraft = {
       ...queuedDraft,
       generatedImages: generatedImagesInProgress.sort((left, right) => left.slideNumber - right.slideNumber),
+      failedSlides:
+        failedSlideNumber !== null
+          ? [
+              ...(queuedDraft.failedSlides ?? []).filter((failure) => failure.slideNumber !== failedSlideNumber),
+              {
+                slideNumber: failedSlideNumber,
+                reason: error instanceof Error ? error.message : "Google image generation failed.",
+                failedAt: new Date().toISOString()
+              }
+            ]
+          : queuedDraft.failedSlides ?? [],
       imageGenerationStatus: partialStatus
     };
 
@@ -315,8 +371,10 @@ async function queueLinkedInImagesForArticle(params: {
     await setProgress(
       params.runId,
       "queue-linkedin-images",
-      generatedImagesInProgress.length > 0 ? 82 : 100,
-      partialStatus === "partial" ? "Some images generated before a throttle or error" : "Image generation failed",
+      generatedImagesInProgress.length > baseImages.length ? 82 : 100,
+      partialStatus === "partial"
+        ? "Some images generated before a throttle or error"
+        : "Image generation failed",
       partialStatus !== "partial"
     );
 
@@ -819,12 +877,16 @@ export async function POST(request: Request) {
     if (step === "queue-linkedin-images" || step === "generate-linkedin-images") {
       const runId = body.runId;
       const articleSlug = body.articleSlug;
+      const slideNumber =
+        typeof body.slideNumber === "number" && Number.isFinite(body.slideNumber)
+          ? body.slideNumber
+          : undefined;
 
       if (!runId || !articleSlug) {
         return NextResponse.json({ error: "Run ID and article slug are required." }, { status: 400 });
       }
 
-      const enrichedDraft = await queueLinkedInImagesForArticle({ runId, articleSlug });
+      const enrichedDraft = await queueLinkedInImagesForArticle({ runId, articleSlug, slideNumber });
 
       return NextResponse.json({
         runId,

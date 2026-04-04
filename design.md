@@ -1,242 +1,162 @@
-# Design System
+# Marketier AI Design System
 
-Living reference for the visual language of Blogify.
+## Overview
 
-Update this file whenever we make a new design decision so UI work stays consistent across the app.
+ Marketier AI is a compact workflow dashboard for turning a brand website into approved blog, LinkedIn, and publishing artifacts. The visual language is calm, readable, and information-dense, with a navy-first light theme, restrained green for primary actions, and purple used sparingly for secondary workflow emphasis.
 
-## Status
+---
 
-- Last updated: 2026-04-02
-- Current stack: Next.js App Router, Tailwind CSS, local file-backed workflow state
-- Primary surfaces: landing page, run workspace, article preview, LinkedIn workflow
+## Colors
 
-## Design Principles
+- **Primary Navy** `#0F172A`: primary actions, strong headers
+- **Secondary Slate** `#64748B`: secondary text, borders
+- **Tertiary Sage** `#059669`: links, CTAs, highlights
+- **Accent Purple** `#8B5CF6`: supporting actions, secondary workflow states, LinkedIn accents
+- **Background** `#F8FAFC`: page background
+- **Surface Default** `#FFFFFF`: card backgrounds
+- **Success** `#22C55E`: confirmed, healthy, publish-ready
+- **Warning** `#EAB308`: pending, caution
+- **Error** `#EF4444`: critical, destructive
+- **Info** `#0EA5E9`: informational, new feature
 
-- Editorial first: content should feel like a polished publishing workspace, not a generic SaaS dashboard.
-- Warm but restrained: use a soft neutral base with a small number of strong accents.
-- High information density: cards should carry useful context without feeling crowded.
-- Progressive disclosure: show the next decision only when the current step is ready.
-- Strong state visibility: queued, pending, approved, publish-ready, scheduled, and failed states must be obvious.
-
-## Color Palette
-
-Base palette:
-
-- Background: `#f4efe6`
-- Panel: `rgba(255, 252, 247, 0.92)`
-- Panel strong: `#fffaf2`
-- Ink: `#1f1d19`
-- Muted text: `#6f675b`
-- Divider / line: `rgba(31, 29, 25, 0.12)`
-
-Accent palette:
-
-- Primary accent: `#c35d2e`
-- Accent soft: `#f2d1c3`
-- Success: `#0f7b49`
-- LinkedIn accent: `#0a66c2`
-- LinkedIn action green: `#16a34a`
-- Attention / warning: use sparingly, mainly for rate-limit or preview fallback messaging
-
-Current gradient language:
-
-- Warm cream to beige background washes
-- Dark brown to burnt-orange loader bars
-- Occasional cool blue/purple accents for LinkedIn and approval states
+Light mode uses a soft green-and-black gradient wash with subtle purple accents in selected controls, chips, and workflow modules. Keep surfaces white, borders light, green reserved for primary actions and positive states, and purple reserved for secondary emphasis only.
 
 ## Typography
 
-Display font:
+- **Headline Font**: Plus Jakarta Sans
+- **Body Font**: DM Sans
+- **Mono Font**: Fira Code
 
-- `Iowan Old Style`, `Palatino Linotype`, `Book Antiqua`, Georgia, serif
-- Used for major page titles, hero text, and article headings where a premium editorial tone is needed
+- **Display**: 40px bold, 1.15 line height
+- **H1**: 32px bold, 1.2 line height
+- **H2**: 24px semibold, 1.25 line height
+- **H3**: 20px semibold, 1.3 line height
+- **H4**: 16px medium, 1.35 line height
+- **Body LG**: 18px regular, 1.6 line height
+- **Body**: 16px regular, 1.6 line height
+- **Body SM**: 14px regular, 1.5 line height
+- **Caption**: 12px medium, 1.4 line height
+- **Code**: Fira Code 14px regular, 1.6 line height
 
-Body font:
+---
 
-- `Avenir Next`, `Segoe UI`, `Helvetica Neue`, sans-serif
-- Used for UI labels, field text, cards, metadata, and workflow controls
+## Spacing
 
-Type rules:
+Base unit: **8px**
 
-- Use large, tight headlines with negative tracking for the hero and article pages
-- Keep body copy readable, compact, and scannable
-- Use small uppercase labels for badges, status chips, and section metadata
+- **xs**: 4px
+- **sm**: 8px
+- **md**: 16px
+- **lg**: 24px
+- **xl**: 32px
+- **2xl**: 48px
+- **3xl**: 64px
 
-## Layout
+## Border Radius
 
-App shell:
+- **sm**: 4px
+- **DEFAULT**: 8px
+- **md**: 12px
+- **lg**: 16px
+- **full**: 9999px
 
-- Main content is centered at roughly `80vw` max width on desktop
-- Mobile should collapse to full width with natural stacking
-- Page content should feel airy, but never sparse
+## Elevation
 
-Primary page patterns:
+Shadows should stay soft and diffused.
 
-- Landing page: start with the intake form and synced profiles
-- Run workspace: show analysis, topic queue, and approved articles
-- Article preview: editorial reading surface with approval and regeneration controls
-- LinkedIn workflow: carousel prompts, image assets, approval, scheduling, and publish actions
+- **sm**: 1px offset, 3px blur, `#0F172A` at 3%
+- **DEFAULT**: 2px offset, 6px blur, `#0F172A` at 5%
+- **md**: 4px offset, 16px blur, `#0F172A` at 7%
+- **lg**: 8px offset, 32px blur, `#0F172A` at 10%
 
-Common spacing:
+---
 
-- Use 24px to 32px gaps between major sections
-- Use 14px to 18px padding for form fields and small controls
-- Use 24px padding for standard cards
-- Use 28px to 40px radius on major containers depending on prominence
+## Components
 
-## Surfaces and Cards
+### Buttons
 
-Primary card style:
+- **Primary**: `#0F172A` fill, white text, no border, darker hover fill
+- **Secondary**: transparent fill, `#0F172A` text, 1px `#0F172A` border
+- **Ghost**: transparent fill, `#475569` text, `#F1F5F9` hover fill
+- **Destructive**: `#EF4444` fill, white text, darker red hover
+- **Accent**: `#8B5CF6` fill, white text, darker violet hover
+- **Disabled**: 40% opacity, no hover/focus motion
 
-- Rounded corners: 22px to 28px
-- Border: 1px solid with the global divider color
-- Background: white-tinted panel with light opacity
-- Shadow: soft, warm shadow with low blur and no harsh contrast
+Sizes:
 
-Editorial cards:
+- **sm**: 32px height, 6px 14px padding
+- **md**: 42px height, 10px 22px padding
+- **lg**: 48px height, 12px 28px padding
 
-- Use layered gradients or subtle washes for hero and review surfaces
-- Important cards can have stronger shadows and slightly richer color
-- Hover states should lift the card by 1px to 2px and deepen the border color
+### Cards
 
-State cards:
+- **Default**: white fill, 1px `#E2E8F0` border, 8px radius, no shadow
+- **Elevated**: white fill, no border, md shadow, 8px radius
+- Use compact padding and avoid stacked overlap effects
+- Optional tinted header strips may use `#0F172A` with white text
 
-- Success and approval should use green-tinted panels or badges
-- Pending and draft states should stay neutral
-- Rate-limit and preview fallback states should use soft amber styling
+### Inputs
 
-## Buttons and Inputs
+- **Default**: 1px `#E2E8F0` border, white fill, no shadow
+- **Hover**: 1px `#0F172A` border
+- **Focus**: 2px `#0F172A` border with `#0F172A18` ring
+- **Error**: 2px `#EF4444` border with `#EF444418` ring
+- **Disabled**: `#F1F5F9` fill, muted text
+- **Height**: 42px
+- **Padding**: 10px 14px
 
-Buttons:
+### Chips
 
-- Primary actions should use filled buttons with strong accent color
-- Secondary actions should use outlined or soft-filled buttons
-- Destructive or negative actions should never compete visually with primary actions
-- Hover states should lift slightly and darken the fill or border
+- **Filter**: `#F8FAFC` fill, `#0F172A` text, `#E2E8F0` border
+- **Filter Active**: `#0F172A` fill, white text
+- **Success**: `#22C55E15` fill, `#16A34A` text
+- **Accent**: `#8B5CF615` fill, `#7C3AED` text
+- **Warning**: `#EAB30815` fill, `#CA8A04` text
+- **Error**: `#EF444415` fill, `#DC2626` text
 
-Inputs:
+### Lists
 
-- Rounded corners: 18px
-- Background: slightly translucent white
-- Border: soft neutral border
-- Focus state: visible ring or accent border
-- Labels should be above fields with medium weight text
+- **Row height**: 48px
+- **Padding**: 8px 16px
+- **Divider**: `#F1F5F9`
+- **Hover**: `#F8FAFC`
+- **Active**: `#0F172A06`
 
-Text areas:
+### Tooltips
 
-- Use comfortable vertical padding
-- Keep them large enough for editorial comments and article edits
+- Background: `#0F172A`
+- Text: `#F8FAFC`
+- Padding: 6px 12px
+- Radius: 8px
+- Max width: 240px
 
-## Status and Badges
+---
 
-Badges are used heavily to indicate workflow state.
+## Do's and Don'ts
 
-Current badge vocabulary:
+1. **Do** use navy + white as the primary visual rhythm.
+2. **Do** reserve green for primary actions and positive states.
+3. **Do** use purple sparingly for secondary emphasis, LinkedIn surfaces, and selected workflow states.
+4. **Do** keep surfaces white and borders light.
+5. **Do** keep cards compact and readable.
+6. **Do** use progressive disclosure for secondary content.
+7. **Do** use clear iconography alongside labels.
+8. **Don't** use beige-heavy surfaces or warm orange accents.
+9. **Don't** introduce heavy shadows or overlapping card stacks.
+10. **Don't** overload the landing page with all workflow sections.
+11. **Don't** let metadata overpower the main action or content artifact.
 
-- `draft`
-- `needs_review`
-- `publish_ready`
-- `approved`
-- `pending_review`
-- `scheduled`
-- `published`
-- `queued`
-- `generating`
-- `partial`
-- `failed`
+---
 
-Badge style:
+## Current Patterns
 
-- Fully rounded pills
-- Small uppercase or compact text
-- Soft background tint plus colored text
-- Avoid heavy borders unless the state needs extra emphasis
-
-## Progress and Loading
-
-Loader behavior:
-
-- Loader should appear only when an action is actively running
-- Prefer the browser-top progress bar for long-running tasks
-- Show both percentage and stage label
-- When possible, preserve partial results and continue updating the UI
-
-Loading states:
-
-- Use skeleton cards for list and dashboard loading
-- Use inline progress for active actions
-- Use top-of-window progress for long or multi-step work
-
-## Hover and Motion
-
-Motion language:
-
-- Keep motion subtle and functional
-- Use small translate-y lift on hover
-- Use gentle progress bar transitions
-- Do not use bouncy or playful motion
-
-Hover effects:
-
-- Cards: lift slightly, strengthen border, and add a soft shadow
-- Buttons: darker fill or border, minimal vertical motion
-- Topic cards and article cards should feel clickable when they are actionable
-
-## Visual Hierarchy
-
-Priority order:
-
-1. The active action or decision
-2. The current content artifact
-3. The supporting metadata
-4. Historical or secondary context
-
-Rules:
-
-- Do not let metadata overpower the article content
-- Do not let controls crowd the preview surface
-- Keep linked artifacts clearly grouped by article slug or run ID
-
-## Current Product-Specific Patterns
-
-Landing page:
-
-- Form-first layout
-- Synced brand/company profiles below the form
-- Strong hero statement with a short trust band
-
-Run workspace:
-
-- Analysis card with website URL, blog URLs, and sitemap summary
-- Topic approval queue with hover emphasis
-- Approved articles list replaces the old single generated-blog block
-
-Article preview:
-
-- Wide preview container
-- Editable article body
-- Copy-to-clipboard actions for key sections
-- Approval flow and regeneration comments
-
-LinkedIn page:
-
-- Suggested title and description
-- Carousel prompts
-- Generated image assets or preview assets
-- Approval, scheduling, and publish controls
-
-## Content Tone
-
-- Direct and practical
-- Editorial rather than promotional
-- Clean, structured, and readable
-- Avoid filler and avoid generic dashboard copy
-
-## Update Rule
-
-When a new design decision is made:
-
-1. Update this file first or alongside the UI change
-2. Keep tokens and component rules aligned with the app
-3. Add any new badge state, color, spacing rule, or page pattern here
-
+- **Landing page**: compact sync form, short hero, and quick actions only
+- **Profiles page**: saved brands and permanent delete action
+- **FAQ page**: clean Q&A cards
+- **Run workspace**: compact analysis, topic queue, approved articles
+- **Article preview**: editor-like review surface with copy, edit, and approval
+- **LinkedIn workflow**: carousel prompts, images, approval, scheduling, publish controls with occasional purple emphasis
+- **Navigation**: slim icon rail, no title text in the rail, small `M` logo mark only
+- **Logo**: compact `M` monogram in a rounded square with green/black gradient and a small accent dot
+- **Theme**: dual light/dark mode with a manual toggle and local persistence
+- **Shell**: sidebar and main content sit on the same plane; do not wrap the whole workspace in one enclosing card

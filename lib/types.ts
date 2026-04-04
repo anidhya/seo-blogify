@@ -160,12 +160,19 @@ export type LinkedInGeneratedImage = {
   providerResponseText: string | null;
 };
 
+export type LinkedInSlideFailure = {
+  slideNumber: number;
+  reason: string;
+  failedAt: string;
+};
+
 export type LinkedInDraft = {
   articleSlug: string;
   suggestedTitle: string;
   suggestedDescription: string;
   carouselPrompts: LinkedInCarouselPrompt[];
   generatedImages: LinkedInGeneratedImage[];
+  failedSlides: LinkedInSlideFailure[];
   imageGenerationStatus: "idle" | "pending" | "queued" | "generating" | "partial" | "ready" | "failed";
   imageModel: string | null;
   hashtags: string[];

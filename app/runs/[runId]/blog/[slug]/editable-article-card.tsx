@@ -94,11 +94,11 @@ export default function EditableArticleCard({ runId, articleSlug, markdown }: Pr
   }
 
   return (
-    <article className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
+    <article className="surface-card p-4 dark:bg-[#121318]">
       <div className="flex items-start justify-between gap-4 max-md:flex-col">
         <div>
-          <h2 className="text-lg font-semibold text-neutral-900">Article</h2>
-          <p className="mt-1 text-sm text-neutral-600">Edit the draft in place, then save it back to the run.</p>
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Article</h2>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Edit the draft in place, then save it back to the run.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <CopyButton text={articleCopyText} label="Copy article" ariaLabel="Copy article markdown to clipboard" />
@@ -113,7 +113,7 @@ export default function EditableArticleCard({ runId, articleSlug, markdown }: Pr
                 {activeAction === "update-blog" ? "Saving…" : "Save"}
               </button>
               <button
-                className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/25"
+                className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-zinc-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/20 dark:border-white/10 dark:bg-white/8 dark:text-zinc-200"
                 type="button"
                 onClick={cancelEdit}
                 disabled={isPending || activeAction === "update-blog"}
@@ -123,7 +123,7 @@ export default function EditableArticleCard({ runId, articleSlug, markdown }: Pr
             </>
           ) : (
             <button
-              className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/25"
+              className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-zinc-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/20 dark:border-white/10 dark:bg-white/8 dark:text-zinc-200"
               type="button"
               onClick={() => setEditing(true)}
             >
@@ -139,16 +139,16 @@ export default function EditableArticleCard({ runId, articleSlug, markdown }: Pr
 
       {editing ? (
         <textarea
-          className="mt-4 min-h-[520px] w-full rounded-3xl border border-black/10 bg-white/90 px-4 py-3 text-sm leading-7 text-neutral-800 outline-none transition focus:border-[#c35d2e] focus:ring-2 focus:ring-[#c35d2e]/20"
+          className="mt-4 min-h-[520px] w-full rounded-2xl border border-black/10 bg-white/90 px-4 py-3 text-sm leading-7 text-zinc-800 outline-none transition focus:border-[#0f7b49] focus:ring-2 focus:ring-[#0f7b49]/20 dark:border-white/8 dark:bg-[#0f1115] dark:text-zinc-100"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           aria-label="Editable article markdown"
         />
         ) : (
-          <div className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-neutral-700">{markdown}</div>
+          <div className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-zinc-700 dark:text-zinc-300">{markdown}</div>
       )}
 
-      {status ? <p className="mt-3 text-sm text-neutral-600">{status}</p> : null}
+      {status ? <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">{status}</p> : null}
     </article>
   );
 }

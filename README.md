@@ -1,6 +1,6 @@
-# Blogify
+# Marketier AI 0.1
 
-Blogify is a Next.js app that turns a company website and supporting blog URLs into a brand-aware blog workflow.
+Marketier AI is a Next.js app that turns a company website and supporting blog URLs into a brand-aware blog workflow.
 
 ## What it does
 
@@ -21,7 +21,9 @@ Blogify is a Next.js app that turns a company website and supporting blog URLs i
 
 ## Main screens
 
-- `/` landing page with the sync form and saved profiles
+- `/` landing page with the sync form and quick workflow actions
+- `/profiles` synced brand and workspace profile list
+- `/faq` product and workflow FAQ
 - `/runs/[runId]` workspace for analysis and topic approval
 - `/runs/[runId]/blog/[slug]` article preview, regeneration, and approval flow
 - `/runs/[runId]/blog/[slug]/linkedin` LinkedIn publishing workflow for the approved article
@@ -31,7 +33,10 @@ Blogify is a Next.js app that turns a company website and supporting blog URLs i
 
 - Next.js App Router
 - Tailwind CSS
+- Dual light/dark theme with a shell-level toggle and settings drawer
 - Shared workspace shell with a slim icon-first navigation rail
+- Sync Brand lives in the landing page form; Settings remains in the left rail
+- Light theme uses green and black as the primary color system
 - Route-level loading states
 - Local file-backed workflow storage under `data/runs/<runId>/`
 

@@ -93,6 +93,15 @@ const linkedInDraftSchema = z.object({
       })
     )
     .default([]),
+  failedSlides: z
+    .array(
+      z.object({
+        slideNumber: z.number(),
+        reason: z.string(),
+        failedAt: z.string()
+      })
+    )
+    .default([]),
   imageGenerationStatus: z.enum(["idle", "pending", "queued", "generating", "partial", "ready", "failed"]).default("idle"),
   imageModel: z.string().nullable().default(null),
   hashtags: z.array(z.string()).min(3).max(10),
