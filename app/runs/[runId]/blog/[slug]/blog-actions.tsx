@@ -130,7 +130,7 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
     <div className="grid gap-3">
       <div className="flex flex-wrap gap-3">
         <a
-          className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/8"
+          className="inline-flex items-center justify-center rounded-xl border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/20 dark:text-[#86efac]"
           href={`/runs/${runId}/blog/${slug}`}
           target="_blank"
           rel="noreferrer"
@@ -176,7 +176,7 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
 
             <div className="flex flex-wrap gap-3">
               <button
-                className="inline-flex items-center justify-center rounded-full bg-[#0f172a] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#111827] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/30 disabled:cursor-progress disabled:opacity-60 dark:bg-[#0f7b49] dark:hover:bg-[#0c6a3f]"
+                className="inline-flex items-center justify-center rounded-xl bg-[#0f172a] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#111827] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/30 disabled:cursor-progress disabled:opacity-60 dark:bg-[#0f7b49] dark:hover:bg-[#0c6a3f]"
                 type="button"
                 onClick={() => submitApproval(true)}
                 disabled={isPending || activeAction === "approve-blog" || !canApprove}
@@ -184,7 +184,7 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
                 {activeAction === "approve-blog" ? "Saving…" : "Approve for publish"}
               </button>
               <button
-                className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-5 py-3 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/20 disabled:cursor-progress disabled:opacity-60 dark:border-white/10 dark:bg-white/8 dark:text-zinc-200"
+                className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white/70 px-5 py-3 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/20 disabled:cursor-progress disabled:opacity-60 dark:border-white/10 dark:bg-white/8 dark:text-zinc-200"
                 type="button"
                 onClick={() => submitApproval(false)}
                 disabled={isPending || activeAction === "approve-blog"}
@@ -228,7 +228,7 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
             {error ? <p className="text-sm text-red-700">{error}</p> : null}
             <div className="flex flex-wrap gap-3">
               <button
-                className="inline-flex items-center justify-center rounded-full bg-[#0f172a] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#111827] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/30 disabled:cursor-progress disabled:opacity-60 dark:bg-[#0f7b49] dark:hover:bg-[#0c6a3f]"
+                className="inline-flex items-center justify-center rounded-xl bg-[#0f172a] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#111827] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/30 disabled:cursor-progress disabled:opacity-60 dark:bg-[#0f7b49] dark:hover:bg-[#0c6a3f]"
                 type="button"
                 onClick={submitRegeneration}
                 disabled={isPending || activeAction === "regenerate-blog"}

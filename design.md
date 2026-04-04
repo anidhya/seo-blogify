@@ -81,6 +81,7 @@ Shadows should stay soft and diffused.
 - **Destructive**: `#EF4444` fill, white text, darker red hover
 - **Accent**: `#8B5CF6` fill, white text, darker violet hover
 - **Disabled**: 40% opacity, no hover/focus motion
+- **Radius**: `12px` for labeled buttons; icon-only buttons may remain circular
 
 Sizes:
 
@@ -145,6 +146,7 @@ Sizes:
 9. **Don't** introduce heavy shadows or overlapping card stacks.
 10. **Don't** overload the landing page with all workflow sections.
 11. **Don't** let metadata overpower the main action or content artifact.
+12. **Don't** turn labeled buttons into pills; keep their radius at 12px and use circular geometry only for icon buttons and small status dots.
 
 ---
 

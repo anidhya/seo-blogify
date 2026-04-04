@@ -248,21 +248,21 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
         />
       ) : null}
 
-      <div className="surface-shell grid gap-3 p-4">
+      <div className="surface-shell grid gap-4 p-5 lg:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#0f7b49] dark:text-[#86efac]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#8b5cf6]/20 bg-[#8b5cf6]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7c3aed] dark:text-[#c4b5fd]">
               LinkedIn publishing
             </div>
-            <h1 className="mt-3 max-w-3xl font-display text-3xl tracking-[-0.04em] text-zinc-50 md:text-4xl">
+            <h1 className="mt-3 font-display text-3xl tracking-[-0.04em] text-zinc-50 md:text-4xl">
               {draft?.suggestedTitle ?? "LinkedIn draft"}
             </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400 md:text-[15px]">
+            <p className="mt-2 text-sm leading-6 text-zinc-400 md:text-[15px]">
               Carousel prompts, approval, scheduling, and publishing for {run.input?.companyName || "this brand"}.
             </p>
           </div>
           <button
-            className="inline-flex items-center justify-center rounded-full bg-[linear-gradient(135deg,#0f172a,#0f7b49)] px-4 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/30 disabled:cursor-progress disabled:opacity-60"
+            className="inline-flex items-center justify-center rounded-xl bg-[linear-gradient(135deg,#0f172a,#8b5cf6)] px-4 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/30 disabled:cursor-progress disabled:opacity-60"
             type="button"
             onClick={generateLinkedInPack}
             disabled={isPending || activeAction === "prepare-linkedin"}
@@ -273,19 +273,31 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
 
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           {workflowSummary.map((item) => (
-            <div key={item.label} className="rounded-[12px] border border-white/8 bg-white/5 px-3 py-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">{item.label}</p>
-              <p className="mt-1 text-sm font-medium text-zinc-50">{item.value}</p>
+            <div
+              key={item.label}
+              className={[
+                "rounded-[12px] border px-3 py-2",
+                item.label === "Pack"
+                  ? "border-violet-500/15 bg-violet-500/7"
+                  : item.label === "Images"
+                    ? "border-sky-500/15 bg-sky-500/7"
+                    : item.label === "Approval"
+                      ? "border-emerald-500/15 bg-emerald-500/7"
+                      : "border-amber-500/15 bg-amber-500/7"
+              ].join(" ")}
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">{item.label}</p>
+              <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-50">{item.value}</p>
             </div>
           ))}
         </div>
       </div>
 
-      <div id="pack" className="surface-shell scroll-mt-24 p-4">
+      <div id="pack" className="surface-shell scroll-mt-24 border-violet-500/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,240,255,0.92))] p-5 lg:p-6 dark:bg-white/5">
         <div className="flex items-start justify-between gap-4 max-md:flex-col">
           <div>
-            <h2 className="text-xl font-semibold tracking-[-0.03em] text-zinc-50">Pack</h2>
-            <p className="mt-1 text-sm text-zinc-400">Suggested title, description, hashtags, and CTA for the LinkedIn post.</p>
+            <h2 className="text-xl font-semibold tracking-[-0.03em] text-zinc-900 dark:text-zinc-50">Pack</h2>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Suggested title, description, hashtags, and CTA for the LinkedIn post.</p>
           </div>
           <CopyButton
             label="Copy pack"
@@ -295,51 +307,51 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
       </div>
 
       {!draft ? (
-        <div className="surface-shell p-5">
-          <h2 className="text-xl font-semibold tracking-[-0.03em] text-zinc-50">No LinkedIn pack yet</h2>
-          <p className="mt-2 text-sm text-zinc-400">Generate the LinkedIn prompts from the approved article.</p>
+        <div className="surface-shell border-sky-500/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,248,255,0.92))] p-5 lg:p-6 dark:bg-white/5">
+          <h2 className="text-xl font-semibold tracking-[-0.03em] text-zinc-900 dark:text-zinc-50">No LinkedIn pack yet</h2>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Generate the LinkedIn prompts from the approved article.</p>
         </div>
       ) : (
         <div className="grid gap-6">
-          <section id="title" className="surface-shell scroll-mt-24 p-4">
+          <section id="title" className="surface-shell scroll-mt-24 border-sky-500/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(237,246,255,0.92))] p-5 lg:p-6 dark:bg-white/5">
             <div className="flex items-start justify-between gap-4 max-md:flex-col">
               <div className="min-w-0">
-                <h2 className="text-xl font-semibold tracking-[-0.03em] text-zinc-50">Suggested post title</h2>
-                <p className="mt-1 text-sm text-zinc-400">Use this as the main LinkedIn post title or hook.</p>
+                <h2 className="text-xl font-semibold tracking-[-0.03em] text-zinc-900 dark:text-zinc-50">Suggested post title</h2>
+                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Use this as the main LinkedIn post title or hook.</p>
               </div>
               <CopyButton label="Copy title" text={draft.suggestedTitle} />
             </div>
-            <p className="mt-4 whitespace-pre-line break-words text-sm leading-7 text-zinc-200">{draft.suggestedTitle}</p>
+            <p className="mt-4 whitespace-pre-line break-words text-sm leading-7 text-zinc-900 dark:text-zinc-200">{draft.suggestedTitle}</p>
           </section>
 
-          <section id="description" className="surface-shell scroll-mt-24 p-4">
+          <section id="description" className="surface-shell scroll-mt-24 border-emerald-500/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(238,253,243,0.92))] p-5 lg:p-6 dark:bg-white/5">
             <div className="flex items-start justify-between gap-4 max-md:flex-col">
               <div className="min-w-0">
-                <h2 className="text-xl font-semibold tracking-[-0.03em] text-zinc-50">Suggested description</h2>
-                <p className="mt-1 text-sm text-zinc-400">This is the LinkedIn-ready description or post body.</p>
+                <h2 className="text-xl font-semibold tracking-[-0.03em] text-zinc-900 dark:text-zinc-50">Suggested description</h2>
+                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">This is the LinkedIn-ready description or post body.</p>
               </div>
               <CopyButton label="Copy description" text={draft.suggestedDescription} />
             </div>
-            <div className="mt-4 grid gap-3 rounded-[12px] border border-white/8 bg-white/5 p-4 dark:bg-white/5">
-              <p className="whitespace-pre-line break-words text-sm leading-7 text-zinc-200">{draft.suggestedDescription}</p>
+            <div className="mt-4 grid gap-3 rounded-[12px] border border-black/10 bg-white/80 p-4 dark:border-white/8 dark:bg-white/5">
+              <p className="whitespace-pre-line break-words text-sm leading-7 text-zinc-900 dark:text-zinc-200">{draft.suggestedDescription}</p>
               <div className="flex flex-wrap gap-2">
                 {draft.hashtags.map((tag) => (
-                  <span key={tag} className="rounded-full bg-[#8b5cf6]/10 px-3 py-1 text-xs font-semibold text-violet-300">
+                  <span key={tag} className="rounded-full bg-[#8b5cf6]/10 px-3 py-1 text-xs font-semibold text-violet-700 dark:text-violet-300">
                     #{tag}
                   </span>
                 ))}
               </div>
-              <p className="text-sm text-zinc-300">
-                <strong className="text-zinc-50">CTA:</strong> {draft.callToAction}
+              <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                <strong className="text-zinc-900 dark:text-zinc-50">CTA:</strong> {draft.callToAction}
               </p>
             </div>
           </section>
 
-          <section id="images" className="surface-shell scroll-mt-24 p-4">
+          <section id="images" className="surface-shell scroll-mt-24 border-amber-500/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,250,233,0.92))] p-5 lg:p-6 dark:bg-white/5">
             <div className="flex items-start justify-between gap-4 max-md:flex-col">
               <div className="min-w-0">
-                <h2 className="text-xl font-semibold tracking-[-0.03em] text-zinc-50">Carousel prompts</h2>
-                <p className="mt-1 text-sm text-zinc-400">
+                <h2 className="text-xl font-semibold tracking-[-0.03em] text-zinc-900 dark:text-zinc-50">Carousel prompts</h2>
+                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
                   Four slide prompts with a consistent visual system. Queue each slide from its own icon button.
                 </p>
               </div>
@@ -353,7 +365,7 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
                 return (
                   <article
                     key={slide.slideNumber}
-                    className="group flex h-full flex-col rounded-[14px] border border-slate-200 bg-white p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#0f7b49]/20 hover:shadow-[0_12px_28px_rgba(15,23,42,0.06)] dark:border-white/8 dark:bg-white/5 dark:hover:bg-white/7"
+                    className="group flex h-full flex-col rounded-[14px] border border-slate-200 bg-white p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#8b5cf6]/20 hover:shadow-[0_12px_28px_rgba(15,23,42,0.06)] dark:border-white/8 dark:bg-white/5 dark:hover:bg-white/7"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 space-y-2">
@@ -390,7 +402,7 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
                           </button>
                         ) : (
                           <button
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:-translate-y-0.5 hover:border-[#0f7b49]/20 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 disabled:cursor-progress disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:hover:bg-white/10"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:-translate-y-0.5 hover:border-[#8b5cf6]/20 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/25 disabled:cursor-progress disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:hover:bg-white/10"
                             type="button"
                             onClick={() => generateLinkedInImages(slide.slideNumber)}
                             disabled={isPending || activeAction === "queue-linkedin-images"}
@@ -431,21 +443,21 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
               })}
             </div>
 
-            <details className="mt-4 rounded-[14px] border border-slate-200 bg-white p-4 shadow-sm dark:border-white/8 dark:bg-white/5" open={draft.generatedImages.length > 0}>
+            <details className="mt-4 rounded-[14px] border border-violet-500/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,240,255,0.92))] p-4 shadow-sm dark:border-white/8 dark:bg-white/5" open={draft.generatedImages.length > 0}>
               <summary className="flex cursor-pointer list-none items-start justify-between gap-3 [&::-webkit-details-marker]:hidden">
                 <div className="min-w-0">
-                  <h3 className="text-base font-semibold tracking-[-0.03em] text-slate-900 dark:text-zinc-50">Generated images</h3>
-                  <p className="text-sm text-slate-500 dark:text-zinc-400">
+                  <h3 className="text-base font-semibold tracking-[-0.03em] text-zinc-900 dark:text-zinc-50">Generated images</h3>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
                     {draft.generatedImages.length
                       ? "Google AI Studio images generated from the carousel prompts."
                       : "Use the slide icon buttons to generate each image."}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-[#0f7b49]/10 px-3 py-1 text-xs font-semibold text-[#0f7b49] dark:bg-[#8b5cf6]/10 dark:text-violet-300">
+                  <span className="rounded-full bg-violet-500/10 px-3 py-1 text-xs font-semibold text-violet-700 dark:bg-[#8b5cf6]/10 dark:text-violet-300">
                     {draft.generatedImages.length} slides
                   </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-white/5 dark:text-zinc-400">
+                  <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-white/5 dark:text-zinc-400">
                     {draft.imageGenerationStatus}
                   </span>
                 </div>
@@ -455,7 +467,7 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
                   draft.generatedImages.map((image) => (
                     <article
                       key={`${image.slideNumber}-${image.generatedAt}`}
-                      className="overflow-hidden rounded-[12px] border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-[#0f7b49]/20 hover:shadow-[0_12px_28px_rgba(15,23,42,0.06)] dark:border-white/8 dark:bg-white/5 dark:hover:bg-white/7"
+                      className="overflow-hidden rounded-[12px] border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-[#8b5cf6]/20 hover:shadow-[0_12px_28px_rgba(15,23,42,0.06)] dark:border-white/8 dark:bg-white/5 dark:hover:bg-white/7"
                     >
                       <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2 dark:border-white/8">
                         <div className="min-w-0">
@@ -489,29 +501,33 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
             </details>
           </section>
 
-          <section id="controls" className="surface-shell scroll-mt-24 p-4">
-            <div className="flex items-start justify-between gap-4 max-md:flex-col">
-              <div>
-                <h2 className="text-xl font-semibold tracking-[-0.03em] text-zinc-50">Publish controls</h2>
-                <p className="mt-1 text-sm text-zinc-400">Approve the LinkedIn content, then schedule or publish.</p>
-              </div>
-              <a
-                className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-zinc-100 transition hover:-translate-y-0.5 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/25"
+            <section id="controls" className="surface-shell scroll-mt-24 border-sky-500/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,248,255,0.92))] p-5 lg:p-6 dark:bg-white/5">
+              <div className="flex items-start justify-between gap-4 max-md:flex-col">
+                <div>
+                <h2 className="text-xl font-semibold tracking-[-0.03em] text-zinc-900 dark:text-zinc-50">Publish controls</h2>
+                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Approve the LinkedIn content, then schedule or publish.</p>
+                </div>
+                <a
+                className="inline-flex items-center justify-center rounded-xl border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:text-[#86efac]"
                 href={`/runs/${runId}/blog/${slug}`}
                 target="_blank"
                 rel="noreferrer"
-              >
+                >
                 Open article
               </a>
             </div>
 
-            <div className="mt-4 grid gap-3">
-              <div className="grid gap-2">
-                <label className="text-sm font-semibold text-neutral-800" htmlFor="linkedin-notes">
+            <div className="mt-4 grid gap-4 xl:grid-cols-3">
+              <div className="grid gap-3 rounded-[12px] border border-violet-500/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,240,255,0.92))] p-4 shadow-sm dark:border-white/8 dark:bg-white/5">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-700 dark:text-zinc-400">Approval</p>
+                  <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">Approve the content or send it back with notes.</p>
+                </div>
+                <label className="text-sm font-semibold text-neutral-800 dark:text-zinc-200" htmlFor="linkedin-notes">
                   Approval notes
                 </label>
                 <textarea
-                  className="min-h-24 w-full rounded-2xl border border-white/8 bg-white/5 px-4 py-3 text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:border-[#8b5cf6] focus:ring-2 focus:ring-[#8b5cf6]/20"
+                  className="min-h-20 w-full rounded-2xl border border-violet-500/15 bg-violet-500/5 px-4 py-3 text-zinc-900 outline-none transition placeholder:text-zinc-500 focus:border-[#8b5cf6] focus:ring-2 focus:ring-[#8b5cf6]/20 dark:border-white/8 dark:bg-[#0f1115] dark:text-zinc-100"
                   id="linkedin-notes"
                   name="linkedinNotes"
                   autoComplete="off"
@@ -519,83 +535,87 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
                   onChange={(event) => setApprovalNotes(event.target.value)}
                   placeholder="Add review notes for the LinkedIn pack…"
                 />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="inline-flex items-center justify-center rounded-xl bg-[#8b5cf6] px-4 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#7c3aed] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/30 disabled:cursor-progress disabled:opacity-60"
+                    type="button"
+                    onClick={() => submitApproval(true)}
+                    disabled={isPending || activeAction === "approve-linkedin"}
+                  >
+                    {activeAction === "approve-linkedin" ? "Saving…" : "Approve"}
+                  </button>
+                  <button
+                    className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white/80 px-4 py-2.5 text-sm font-medium text-zinc-800 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/25 disabled:cursor-progress disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:hover:bg-white/10"
+                    type="button"
+                    onClick={() => submitApproval(false)}
+                    disabled={isPending || activeAction === "approve-linkedin"}
+                  >
+                    Needs revision
+                  </button>
+                </div>
               </div>
 
-              <div className="flex flex-wrap gap-3">
-                <button
-                  className="inline-flex items-center justify-center rounded-full bg-[#8b5cf6] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#7c3aed] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/30 disabled:cursor-progress disabled:opacity-60"
-                  type="button"
-                  onClick={() => submitApproval(true)}
-                  disabled={isPending || activeAction === "approve-linkedin"}
-                >
-                  {activeAction === "approve-linkedin" ? "Saving…" : "Approve"}
-                </button>
-                <button
-                  className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-zinc-100 transition hover:-translate-y-0.5 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/25 disabled:cursor-progress disabled:opacity-60"
-                  type="button"
-                  onClick={() => submitApproval(false)}
-                  disabled={isPending || activeAction === "approve-linkedin"}
-                >
-                  Needs revision
-                </button>
+              <div className="grid gap-3 rounded-[12px] border border-cyan-500/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,253,255,0.92))] p-4 shadow-sm dark:border-white/8 dark:bg-white/5">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-zinc-400">Connection</p>
+                  <p className="mt-1 text-sm text-cyan-900 dark:text-zinc-300">
+                    {connection?.connected
+                      ? `Connected${connection.memberName ? ` as ${connection.memberName}` : ""}`
+                      : "Not connected yet"}
+                  </p>
+                </div>
+                {connection?.connected ? (
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300">OAuth connection is active.</p>
+                ) : (
+                  <a
+                    className="inline-flex w-fit items-center justify-center rounded-xl border border-[#0a66c2]/20 bg-[#0a66c2] px-4 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#0857a7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0a66c2]/30"
+                    href={`/api/linkedin/connect?runId=${encodeURIComponent(runId)}&articleSlug=${encodeURIComponent(slug)}`}
+                  >
+                    Connect LinkedIn
+                  </a>
+                )}
               </div>
-            </div>
 
-            <div className="mt-5 grid gap-3 rounded-[12px] border border-slate-200 bg-white p-4 shadow-sm dark:border-white/8 dark:bg-white/5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-zinc-400">Connection</p>
-              <p className="text-sm text-slate-700 dark:text-zinc-300">
-                {connection?.connected
-                  ? `Connected${connection.memberName ? ` as ${connection.memberName}` : ""}`
-                  : "Not connected yet"}
-              </p>
-              {!connection?.connected ? (
-                <a
-                  className="inline-flex items-center justify-center rounded-full border border-[#0a66c2]/20 bg-[#0a66c2] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#0857a7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0a66c2]/30"
-                  href={`/api/linkedin/connect?runId=${encodeURIComponent(runId)}&articleSlug=${encodeURIComponent(slug)}`}
-                >
-                  Connect LinkedIn
-                </a>
-              ) : (
-                <p className="text-sm text-emerald-300">OAuth connection is active.</p>
-              )}
-            </div>
-
-            <div className="mt-5 grid gap-3 rounded-[12px] border border-slate-200 bg-white p-4 shadow-sm dark:border-white/8 dark:bg-white/5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-zinc-400">Schedule</p>
-              <input
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#8b5cf6] focus:ring-2 focus:ring-[#8b5cf6]/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/8 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-500"
-                type="datetime-local"
-                value={scheduleFor}
-                onChange={(event) => setScheduleFor(event.target.value)}
-                disabled={!canSchedule}
-              />
-              <div className="flex flex-wrap gap-3">
-                <button
-                  className="inline-flex items-center justify-center rounded-full bg-[#16a34a] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#15803d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#16a34a]/30 disabled:cursor-progress disabled:opacity-60"
-                  type="button"
-                  onClick={scheduleLinkedIn}
-                  disabled={isPending || activeAction === "schedule-linkedin" || !canSchedule}
-                >
-                  {activeAction === "schedule-linkedin" ? "Scheduling…" : "Schedule"}
-                </button>
-                <button
-                  className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-zinc-100 transition hover:-translate-y-0.5 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#16a34a]/25 disabled:cursor-progress disabled:opacity-60"
-                  type="button"
-                  onClick={publishLinkedIn}
-                  disabled={isPending || activeAction === "publish-linkedin" || !canPublishNow}
-                >
-                  {activeAction === "publish-linkedin" ? "Publishing…" : "Publish now"}
-                </button>
+              <div className="grid gap-3 rounded-[12px] border border-emerald-500/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(237,252,243,0.92))] p-4 shadow-sm dark:border-white/8 dark:bg-white/5">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-zinc-400">Schedule</p>
+                  <p className="mt-1 text-sm text-emerald-900 dark:text-zinc-300">Pick a time or publish immediately after approval.</p>
+                </div>
+                <input
+                  className="w-full rounded-2xl border border-emerald-500/15 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 outline-none transition placeholder:text-emerald-400 focus:border-[#16a34a] focus:ring-2 focus:ring-[#16a34a]/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/8 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                  type="datetime-local"
+                  value={scheduleFor}
+                  onChange={(event) => setScheduleFor(event.target.value)}
+                  disabled={!canSchedule}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="inline-flex items-center justify-center rounded-xl bg-[#16a34a] px-4 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#15803d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#16a34a]/30 disabled:cursor-progress disabled:opacity-60"
+                    type="button"
+                    onClick={scheduleLinkedIn}
+                    disabled={isPending || activeAction === "schedule-linkedin" || !canSchedule}
+                  >
+                    {activeAction === "schedule-linkedin" ? "Scheduling…" : "Schedule"}
+                  </button>
+                  <button
+                    className="inline-flex items-center justify-center rounded-xl border border-[#8b5cf6]/20 bg-[#8b5cf6]/10 px-4 py-2.5 text-sm font-medium text-[#7c3aed] transition hover:-translate-y-0.5 hover:bg-[#8b5cf6]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#16a34a]/25 disabled:cursor-progress disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:hover:bg-white/10"
+                    type="button"
+                    onClick={publishLinkedIn}
+                    disabled={isPending || activeAction === "publish-linkedin" || !canPublishNow}
+                  >
+                    {activeAction === "publish-linkedin" ? "Publishing…" : "Publish now"}
+                  </button>
+                </div>
+                {!canSchedule ? <p className="text-sm text-slate-600 dark:text-zinc-400">Approve the LinkedIn content before scheduling it.</p> : null}
+                {!canPublishNow ? <p className="text-sm text-slate-600 dark:text-zinc-400">Connect LinkedIn to publish immediately.</p> : null}
               </div>
-              {!canSchedule ? <p className="text-sm text-slate-500 dark:text-zinc-400">Approve the LinkedIn content before scheduling it.</p> : null}
-              {!canPublishNow ? <p className="text-sm text-slate-500 dark:text-zinc-400">Connect LinkedIn to publish immediately.</p> : null}
             </div>
           </section>
 
-          <section id="review" className="surface-shell scroll-mt-24 p-4">
+          <section id="review" className="surface-shell scroll-mt-24 border-rose-500/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,240,244,0.92))] p-5 lg:p-6 dark:bg-white/5">
             <div className="flex items-start justify-between gap-4 max-md:flex-col">
               <div>
-                <h2 className="text-xl font-semibold tracking-[-0.03em] text-zinc-50">Approval history</h2>
+                <h2 className="text-xl font-semibold tracking-[-0.03em] text-zinc-900 dark:text-zinc-50">Approval history</h2>
               </div>
               <CopyButton
                 label="Copy history"
@@ -607,12 +627,12 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
             <div className="mt-4 grid gap-3">
               {linkedIn?.approvals?.length ? (
                 linkedIn.approvals.map((approval) => (
-                  <div key={approval.approvalId} className="rounded-[12px] border border-slate-200 bg-white p-3 shadow-sm dark:border-white/8 dark:bg-white/5">
-                    <p className="text-sm text-slate-700 dark:text-zinc-300">
-                      <strong className="text-slate-900 dark:text-zinc-50">Decision:</strong>{" "}
+                  <div key={approval.approvalId} className="rounded-[12px] border border-rose-500/15 bg-white p-3 shadow-sm dark:border-white/8 dark:bg-white/5">
+                    <p className="text-sm text-rose-900 dark:text-zinc-300">
+                      <strong className="text-rose-700 dark:text-zinc-50">Decision:</strong>{" "}
                       {approval.approved ? "Approved" : "Needs revision"}
                     </p>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
+                    <p className="mt-1 text-sm text-rose-700/80 dark:text-zinc-400">
                       <strong className="text-zinc-50">Notes:</strong> {approval.notes || "n/a"}
                     </p>
                   </div>
@@ -623,14 +643,14 @@ export default function LinkedInWorkflowClient({ runId, slug, run }: Props) {
             </div>
             {publication ? (
               <div className="mt-4 rounded-[12px] border border-emerald-500/20 bg-emerald-500/10 p-4">
-                <p className="text-sm font-semibold text-emerald-200">Publication status: {publication.status}</p>
-                <p className="mt-1 text-sm text-emerald-200">Published at: {publication.publishedAt ?? "n/a"}</p>
+                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Publication status: {publication.status}</p>
+                <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">Published at: {publication.publishedAt ?? "n/a"}</p>
               </div>
             ) : null}
             {schedule ? (
               <div className="mt-4 rounded-[12px] border border-indigo-500/20 bg-indigo-500/10 p-4">
-                <p className="text-sm font-semibold text-indigo-200">Scheduled for {schedule.scheduledFor}</p>
-                <p className="mt-1 text-sm text-indigo-200">{schedule.notes || "No scheduling notes."}</p>
+                <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-200">Scheduled for {schedule.scheduledFor}</p>
+                <p className="mt-1 text-sm text-indigo-800 dark:text-indigo-200">{schedule.notes || "No scheduling notes."}</p>
               </div>
             ) : null}
           </section>

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import WorkspaceShell from "../components/workspace-shell";
 
 const faqs = [
@@ -31,14 +30,7 @@ export default function FaqPage() {
         { label: "Sync", href: "/" },
         { label: "FAQ", active: true }
       ]}
-      topAction={
-        <Link
-          className="inline-flex items-center justify-center rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25"
-          href="/"
-        >
-          Back to sync
-        </Link>
-      }
+      topAction={null}
       navItems={[
         { label: "Sync", href: "/", icon: "sync" },
         { label: "Profiles", href: "/profiles", icon: "articles" },

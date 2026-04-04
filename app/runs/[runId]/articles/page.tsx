@@ -32,14 +32,7 @@ export default async function ArticlesPage({ params }: PageProps) {
         { label: "Workspace", href: `/runs/${runId}` },
         { label: "Articles", active: true }
       ]}
-      topAction={
-          <Link
-            className="inline-flex items-center justify-center rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25"
-            href={`/runs/${runId}`}
-          >
-            Back to workspace
-        </Link>
-      }
+      topAction={null}
       navItems={[
         { label: "Analysis", href: `/runs/${runId}`, icon: "analysis", status: run.analysis ? "complete" : "idle" },
         { label: "Topics", href: `/runs/${runId}/topics`, icon: "topics", status: run.topics?.topics?.length ? "complete" : "idle" },
@@ -94,7 +87,7 @@ export default async function ArticlesPage({ params }: PageProps) {
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   <a
-                    className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-zinc-900 transition hover:-translate-y-0.5 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:hover:bg-white/10"
+                    className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white px-4 py-2 text-sm font-medium text-zinc-900 transition hover:-translate-y-0.5 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:hover:bg-white/10"
                     href={`/runs/${runId}/blog/${article.articleSlug}`}
                     target="_blank"
                     rel="noreferrer"
@@ -102,7 +95,7 @@ export default async function ArticlesPage({ params }: PageProps) {
                     Open preview
                   </a>
                   <a
-                    className="inline-flex items-center justify-center rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:text-[#86efac]"
+                    className="inline-flex items-center justify-center rounded-xl border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:text-[#86efac]"
                     href={`/runs/${runId}/blog/${article.articleSlug}/linkedin`}
                     target="_blank"
                     rel="noreferrer"

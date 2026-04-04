@@ -40,6 +40,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
     description,
     copyLabel,
     copyText,
+    accentClass,
     children,
     defaultOpen = false
   }: {
@@ -48,14 +49,35 @@ export default async function BlogPreviewPage({ params }: PageProps) {
     description?: string;
     copyLabel?: string;
     copyText?: string;
+    accentClass?: string;
     children: ReactNode;
     defaultOpen?: boolean;
   }) {
     return (
-      <details className="rounded-[12px] border border-black/10 bg-white/85 shadow-[0_10px_24px_rgba(15,23,42,0.04)] transition open:shadow-[0_16px_32px_rgba(15,23,42,0.07)] dark:border-white/8 dark:bg-white/5" open={defaultOpen} id={id}>
+      <details
+        className={`rounded-[12px] border bg-white/85 shadow-[0_10px_24px_rgba(15,23,42,0.04)] transition open:shadow-[0_16px_32px_rgba(15,23,42,0.07)] dark:border-white/8 dark:bg-white/5 ${accentClass ?? "border-black/10"}`}
+        open={defaultOpen}
+        id={id}
+      >
         <summary className="flex cursor-pointer list-none items-start justify-between gap-3 rounded-[12px] px-4 py-3 text-left [&::-webkit-details-marker]:hidden">
           <div>
-            <h2 className="text-sm font-semibold text-neutral-900 dark:text-zinc-50">{title}</h2>
+            <div className="flex items-center gap-2">
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${accentClass?.includes("sky")
+                    ? "bg-sky-500"
+                    : accentClass?.includes("emerald")
+                      ? "bg-emerald-500"
+                      : accentClass?.includes("violet")
+                        ? "bg-violet-500"
+                        : accentClass?.includes("amber")
+                          ? "bg-amber-500"
+                          : accentClass?.includes("rose")
+                            ? "bg-rose-500"
+                            : "bg-[#0f7b49]"}`
+              }
+              />
+              <h2 className="text-sm font-semibold text-neutral-900 dark:text-zinc-50">{title}</h2>
+            </div>
             {description ? <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-zinc-400">{description}</p> : null}
           </div>
           <div className="flex items-center gap-2">
@@ -84,14 +106,14 @@ export default async function BlogPreviewPage({ params }: PageProps) {
       topAction={
         <div className="flex flex-wrap items-center gap-2">
           <a
-            className="inline-flex items-center justify-center rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25"
+            className="inline-flex items-center justify-center rounded-xl border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25"
             href={`/runs/${runId}`}
           >
             Back to workspace
           </a>
           {latestApproval?.approved ? (
             <a
-              className="inline-flex items-center justify-center rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:text-[#86efac]"
+              className="inline-flex items-center justify-center rounded-xl border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:text-[#86efac]"
               href={`/runs/${runId}/blog/${slug}/linkedin`}
             >
               Open LinkedIn workflow
@@ -106,18 +128,21 @@ export default async function BlogPreviewPage({ params }: PageProps) {
         { label: "History", href: "#history", icon: "publish", status: latestApproval ? "complete" : "idle" },
         { label: "Images", href: "#images", icon: "articles", status: "complete" },
         { label: "Links", href: "#links", icon: "sync", status: "complete" },
-        { label: "FAQs", href: "#faqs", icon: "topics", status: "complete" }
+        { label: "FAQs", href: "#faqs", icon: "topics", status: "complete" },
+        ...(latestApproval?.approved
+          ? [{ label: "LinkedIn", href: `/runs/${runId}/blog/${slug}/linkedin`, icon: "linkedin" as const, status: "complete" as const }]
+          : [])
       ]}
     >
-      <section className="surface-shell grid gap-4 p-4">
-        <div className="rounded-[12px] border border-white/8 bg-white/82 p-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)] dark:bg-white/5">
+      <section className="grid gap-5">
+        <div className="rounded-[12px] border border-black/8 bg-white/70 p-4 shadow-[0_8px_18px_rgba(15,23,42,0.03)] dark:border-white/8 dark:bg-white/5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="inline-flex w-fit items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500 dark:border-white/10 dark:bg-white/5 dark:text-zinc-400">
                 Blog preview
               </div>
-              <h1 className="mt-3 max-w-4xl font-display text-3xl tracking-[-0.04em] text-neutral-900 md:text-4xl dark:text-zinc-50">{blog.title}</h1>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-neutral-600 md:text-[15px] dark:text-zinc-400">{blog.summary}</p>
+              <h1 className="mt-3 font-display text-3xl tracking-[-0.04em] text-neutral-900 md:text-4xl dark:text-zinc-50">{blog.title}</h1>
+              <p className="mt-2 text-sm leading-6 text-neutral-600 md:text-[15px] dark:text-zinc-400">{blog.summary}</p>
             </div>
             <div className="grid gap-2 text-xs text-neutral-500 dark:text-zinc-400">
               <div className="flex flex-wrap gap-2">
@@ -137,7 +162,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_360px]">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_320px]">
           <div className="grid gap-4">
             <EditableArticleCard runId={runId} articleSlug={slug} markdown={blog.markdown} />
           </div>
@@ -151,6 +176,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
               description="Compact metadata block for CMS reuse."
               copyLabel="Copy meta"
               copyText={`Title: ${blog.meta.title}\nDescription: ${blog.meta.description}\nKeywords: ${blog.meta.keywords.join(", ")}`}
+              accentClass="border-sky-500/15 bg-sky-500/7 dark:border-sky-500/15 dark:bg-white/5"
             >
               <div className="grid gap-2 text-sm text-neutral-600 dark:text-zinc-400">
                 <p>
@@ -175,6 +201,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
               description="Core points in compact form."
               copyLabel="Copy takeaways"
               copyText={blog.keyTakeaways.join("\n")}
+              accentClass="border-emerald-500/15 bg-emerald-500/7 dark:border-emerald-500/15 dark:bg-white/5"
             >
               <div className="flex flex-wrap gap-2">
                 {blog.keyTakeaways.map((takeaway) => (
@@ -191,6 +218,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
               description="Three consistent prompts for later image generation."
               copyLabel="Copy prompts"
               copyText={blog.imagePrompts.join("\n\n")}
+              accentClass="border-violet-500/15 bg-violet-500/7 dark:border-violet-500/15 dark:bg-white/5"
             >
               <div className="grid gap-3">
                 {blog.imagePrompts.map((prompt, index) => (
@@ -210,6 +238,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
               copyText={blog.internalLinks
                 .map((link) => `${link.anchorText} -> ${link.targetUrl}\nPlacement: ${link.placement}\nWhy: ${link.rationale}`)
                 .join("\n\n")}
+              accentClass="border-amber-500/15 bg-amber-500/7 dark:border-amber-500/15 dark:bg-white/5"
             >
               <div className="grid gap-3">
                 {blog.internalLinks.length === 0 ? (
@@ -241,6 +270,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
               description="Latest decisions and review notes."
               copyLabel="Copy approvals"
               copyText={approvals.map((approval) => `${approval.approved ? "Approved" : "Needs revision"} | ${approval.notes || "n/a"} | ${approval.score ?? "n/a"}`).join("\n")}
+              accentClass="border-rose-500/15 bg-rose-500/7 dark:border-rose-500/15 dark:bg-white/5"
             >
               <div className="grid gap-3">
                 {approvals.length === 0 ? <p className="text-sm text-neutral-600 dark:text-zinc-400">No approval decisions yet.</p> : null}
@@ -266,6 +296,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
               description="Frequently asked questions included in the article."
               copyLabel="Copy FAQs"
               copyText={blog.faqs.map((faq) => `Q: ${faq.question}\nA: ${faq.answer}`).join("\n\n")}
+              accentClass="border-indigo-500/15 bg-indigo-500/7 dark:border-indigo-500/15 dark:bg-white/5"
             >
               <div className="grid gap-3">
                 {blog.faqs.map((faq) => (

@@ -190,7 +190,7 @@ export default function HomePage() {
 
               <div className="flex flex-wrap gap-2">
                 <button
-                  className="inline-flex items-center justify-center rounded-full bg-[linear-gradient(135deg,#0f172a,#0f7b49)] px-4 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/30 disabled:cursor-progress disabled:opacity-60"
+                  className="inline-flex items-center justify-center rounded-xl bg-[linear-gradient(135deg,#0f172a,#0f7b49)] px-4 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/30 disabled:cursor-progress disabled:opacity-60"
                   type="button"
                   disabled={isPending}
                   onClick={runAnalyze}
@@ -198,13 +198,13 @@ export default function HomePage() {
                   {isPending ? "Analyzing…" : "Analyze Brand"}
                 </button>
                 <Link
-                  className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2.5 text-sm font-medium text-zinc-900 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10"
+                  className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white/80 px-4 py-2.5 text-sm font-medium text-zinc-900 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10"
                   href="/profiles"
                 >
                   View profiles
                 </Link>
                 <Link
-                  className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2.5 text-sm font-medium text-zinc-900 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10"
+                  className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white/80 px-4 py-2.5 text-sm font-medium text-zinc-900 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10"
                   href="/faq"
                 >
                   FAQ

@@ -161,9 +161,9 @@ export default function WorkspaceShell({ title, subtitle, navItems, children, to
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(195,93,46,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.08),transparent_18%),linear-gradient(180deg,#faf8f4_0%,#f5efe7_100%)] text-zinc-900 dark:bg-[radial-gradient(circle_at_top_left,rgba(195,93,46,0.18),transparent_24%),radial-gradient(circle_at_top_right,rgba(139,92,246,0.12),transparent_18%),linear-gradient(180deg,#0f0f12_0%,#101114_100%)] dark:text-zinc-50">
-      <div className="mx-auto grid min-h-screen max-w-[min(1440px,92vw)] grid-cols-1 gap-3 px-2 py-2 lg:grid-cols-[76px_minmax(0,1fr)] lg:px-3">
-        <aside className="sticky top-2 z-30 self-start lg:h-[calc(100vh-1rem)]">
-          <div className="flex h-full flex-row items-center gap-2 rounded-none border border-transparent bg-transparent px-1 py-1 shadow-none backdrop-blur-0 lg:flex-col lg:items-stretch">
+      <div className="grid min-h-screen w-full grid-cols-1 gap-0 lg:grid-cols-[76px_minmax(0,1fr)]">
+        <aside className="sticky top-0 z-30 self-start lg:h-screen">
+          <div className="flex h-full flex-row items-center gap-2 border border-transparent bg-transparent px-1 py-1 shadow-none backdrop-blur-0 lg:flex-col lg:items-stretch">
             {backHref ? (
               <a
                 className="group flex min-w-[58px] flex-1 flex-col items-center justify-center gap-1 rounded-[1rem] border border-transparent bg-white/65 px-2 py-2 text-center text-[10px] font-semibold text-zinc-500 transition hover:-translate-y-0.5 hover:bg-white/90 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/30 lg:min-w-0 lg:flex-none dark:bg-white/5 dark:text-zinc-400 dark:hover:bg-white/8 dark:hover:text-zinc-100"
@@ -235,7 +235,7 @@ export default function WorkspaceShell({ title, subtitle, navItems, children, to
         </aside>
 
         <main className="min-w-0">
-          <div className="relative flex min-h-[calc(100vh-1rem)] flex-col gap-3 rounded-none border border-transparent bg-transparent p-0 shadow-none backdrop-blur-0 lg:p-0">
+          <div className="relative flex min-h-screen flex-col gap-3 border border-transparent bg-transparent p-0 shadow-none backdrop-blur-0 lg:p-0">
             <header className="flex flex-wrap items-start justify-between gap-3 rounded-[12px] border border-white/10 bg-white/85 px-3 py-2.5 shadow-[0_10px_22px_rgba(15,23,42,0.04)] dark:border-white/8 dark:bg-white/5 dark:shadow-none">
               <div className="min-w-0">
                 {breadcrumbs?.length ? (
