@@ -17,7 +17,7 @@ Marketier AI is a Next.js app that turns a company website and supporting blog U
 - prepares LinkedIn post packs after article approval, including a suggested title, suggested description, and 4 carousel prompts
 - generates LinkedIn carousel images with Google AI Studio from the approved carousel prompts and shows them on the LinkedIn page
 - supports LinkedIn OAuth connection, approval, scheduling, and publish-now actions
-- stores every workflow artifact locally for later reuse
+- stores every workflow artifact locally during development and in Vercel Blob in production when configured
 
 ## Main screens
 
@@ -38,7 +38,7 @@ Marketier AI is a Next.js app that turns a company website and supporting blog U
 - Sync Brand lives in the landing page form; Settings remains in the left rail
 - Light theme uses green and black as the primary color system
 - Route-level loading states
-- Local file-backed workflow storage under `data/runs/<runId>/`
+- Local file-backed workflow storage in development and Vercel Blob-backed storage on deploy when `BLOB_READ_WRITE_TOKEN` is set
 
 ## Setup
 
@@ -79,10 +79,11 @@ Important variables:
 - `LINKEDIN_SCOPE` defaults to `w_member_social`
 - `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Google AI Studio image generation
 - `GOOGLE_IMAGE_MODEL` defaults to `gemini-3.1-flash-lite-preview`
+- `BLOB_READ_WRITE_TOKEN` enables persistent storage with Vercel Blob on deploy
 
 ## Workflow artifacts
 
-Each run is written to `data/runs/<runId>/` as JSON and Markdown.
+Each run is written as JSON and Markdown records. In development, those files live under `data/runs/<runId>/`; on Vercel with `BLOB_READ_WRITE_TOKEN` configured, they are stored in Vercel Blob under `runs/<runId>/...`.
 
 Key files:
 
@@ -113,5 +114,5 @@ Key files:
 - The LinkedIn workflow page can generate 4 carousel images with Google AI Studio and render them on the same page.
 - LinkedIn publish state is stored per article slug inside `linkedin.json`.
 - The landing page, workspace, preview, and LinkedIn pages all share the same compact shell so the UI stays short and navigable.
-- The current storage layer writes to the local filesystem in development and to `/tmp/blogify-data` on Vercel. That keeps the app running on Vercel, but the data is still ephemeral. For production durability, swap `lib/storage.ts` to persistent storage such as Vercel Blob, Postgres, or KV.
+- The storage layer writes to the local filesystem in development and to Vercel Blob on deploy when `BLOB_READ_WRITE_TOKEN` is set. If the Blob token is missing on Vercel, the app falls back to the instance filesystem and the data is still ephemeral.
 - CMS publishing is not wired yet. The output is generated as publication-ready markdown for the next handoff step.
