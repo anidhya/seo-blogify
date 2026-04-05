@@ -51,8 +51,13 @@ import type {
   LinkedInSchedule
 } from "@/lib/types";
 
-const DATA_ROOT = path.join(process.cwd(), "data", "runs");
-const LINKEDIN_ROOT = path.join(process.cwd(), "data", "linkedin");
+const STORAGE_ROOT = process.env.DATA_ROOT
+  ? path.resolve(process.env.DATA_ROOT)
+  : process.env.VERCEL === "1"
+    ? path.join("/tmp", "blogify-data")
+    : path.join(process.cwd(), "data");
+const DATA_ROOT = path.join(STORAGE_ROOT, "runs");
+const LINKEDIN_ROOT = path.join(STORAGE_ROOT, "linkedin");
 const SCHEMA_VERSION = "1" as const;
 
 type LinkedInOAuthState = {

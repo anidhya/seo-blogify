@@ -113,5 +113,5 @@ Key files:
 - The LinkedIn workflow page can generate 4 carousel images with Google AI Studio and render them on the same page.
 - LinkedIn publish state is stored per article slug inside `linkedin.json`.
 - The landing page, workspace, preview, and LinkedIn pages all share the same compact shell so the UI stays short and navigable.
-- The current storage layer is local filesystem-based, which is fine for development but not durable on Vercel serverless. For production on Vercel, swap `lib/storage.ts` to persistent storage such as Vercel Blob, Postgres, or KV.
+- The current storage layer writes to the local filesystem in development and to `/tmp/blogify-data` on Vercel. That keeps the app running on Vercel, but the data is still ephemeral. For production durability, swap `lib/storage.ts` to persistent storage such as Vercel Blob, Postgres, or KV.
 - CMS publishing is not wired yet. The output is generated as publication-ready markdown for the next handoff step.
