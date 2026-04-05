@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { del as deleteBlob, get as getBlob, list as listBlobs, put as putBlob } from "@vercel/blob";
 import {
   approvedArticleSchema,
   approvedArticlesSchema,
@@ -58,6 +59,8 @@ const STORAGE_ROOT = process.env.DATA_ROOT
     : path.join(process.cwd(), "data");
 const DATA_ROOT = path.join(STORAGE_ROOT, "runs");
 const LINKEDIN_ROOT = path.join(STORAGE_ROOT, "linkedin");
+const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
+const USE_BLOB_STORAGE = Boolean(BLOB_TOKEN);
 const SCHEMA_VERSION = "1" as const;
 
 type LinkedInOAuthState = {
@@ -233,16 +236,55 @@ function filePath(runId: string, fileName: string) {
   return path.join(runDir(runId), fileName);
 }
 
+function blobPath(...segments: string[]) {
+  return path.posix.join(...segments);
+}
+
+function blobOptions() {
+  return BLOB_TOKEN ? { token: BLOB_TOKEN } : {};
+}
+
 async function ensureRunDir(runId: string) {
   await mkdir(runDir(runId), { recursive: true });
 }
 
 async function writeJson(runId: string, fileName: string, value: unknown) {
+  const payload = JSON.stringify(value, null, 2);
+
+  if (USE_BLOB_STORAGE) {
+    await putBlob(blobPath("runs", runId, fileName), payload, {
+      access: "private",
+      allowOverwrite: true,
+      contentType: "application/json; charset=utf-8",
+      ...blobOptions()
+    });
+    return;
+  }
+
   await ensureRunDir(runId);
-  await writeFile(filePath(runId, fileName), JSON.stringify(value, null, 2), "utf8");
+  await writeFile(filePath(runId, fileName), payload, "utf8");
 }
 
 async function readJson<T>(runId: string, fileName: string): Promise<T | null> {
+  if (USE_BLOB_STORAGE) {
+    try {
+      const blob = await getBlob(blobPath("runs", runId, fileName), {
+        access: "private",
+        useCache: false,
+        ...blobOptions()
+      });
+
+      if (!blob || blob.statusCode !== 200 || !blob.stream) {
+        return null;
+      }
+
+      const content = await new Response(blob.stream).text();
+      return JSON.parse(content) as T;
+    } catch {
+      return null;
+    }
+  }
+
   try {
     const content = await readFile(filePath(runId, fileName), "utf8");
     return JSON.parse(content) as T;
@@ -260,16 +302,109 @@ async function ensureLinkedInDir() {
 }
 
 async function writeLinkedInJson(fileName: string, value: unknown) {
+  const payload = JSON.stringify(value, null, 2);
+
+  if (USE_BLOB_STORAGE) {
+    await putBlob(blobPath("linkedin", fileName), payload, {
+      access: "private",
+      allowOverwrite: true,
+      contentType: "application/json; charset=utf-8",
+      ...blobOptions()
+    });
+    return;
+  }
+
   await ensureLinkedInDir();
-  await writeFile(path.join(LINKEDIN_ROOT, fileName), JSON.stringify(value, null, 2), "utf8");
+  await writeFile(path.join(LINKEDIN_ROOT, fileName), payload, "utf8");
 }
 
 async function readLinkedInJson<T>(fileName: string): Promise<T | null> {
+  if (USE_BLOB_STORAGE) {
+    try {
+      const blob = await getBlob(blobPath("linkedin", fileName), {
+        access: "private",
+        useCache: false,
+        ...blobOptions()
+      });
+
+      if (!blob || blob.statusCode !== 200 || !blob.stream) {
+        return null;
+      }
+
+      const content = await new Response(blob.stream).text();
+      return JSON.parse(content) as T;
+    } catch {
+      return null;
+    }
+  }
+
   try {
     const content = await readFile(path.join(LINKEDIN_ROOT, fileName), "utf8");
     return JSON.parse(content) as T;
   } catch {
     return null;
+  }
+}
+
+async function writeTextFile(runId: string, fileName: string, value: string) {
+  if (USE_BLOB_STORAGE) {
+    await putBlob(blobPath("runs", runId, fileName), value, {
+      access: "private",
+      allowOverwrite: true,
+      contentType: "text/markdown; charset=utf-8",
+      ...blobOptions()
+    });
+    return;
+  }
+
+  await ensureRunDir(runId);
+  await writeFile(filePath(runId, fileName), value, "utf8");
+}
+
+async function listRunIdsFromBlobs() {
+  const runIds = new Set<string>();
+  let cursor: string | undefined;
+
+  do {
+    const page = await listBlobs({
+      prefix: "runs/",
+      mode: "expanded",
+      cursor,
+      ...blobOptions()
+    });
+
+    for (const blob of page.blobs) {
+      const [, runId] = blob.pathname.split("/");
+      if (runId) {
+        runIds.add(runId);
+      }
+    }
+
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+
+  return Array.from(runIds);
+}
+
+async function deleteRunBlobs(runId: string) {
+  const paths: string[] = [];
+  let cursor: string | undefined;
+  const prefix = blobPath("runs", runId) + "/";
+
+  do {
+    const page = await listBlobs({
+      prefix,
+      mode: "expanded",
+      cursor,
+      ...blobOptions()
+    });
+
+    paths.push(...page.blobs.map((blob) => blob.pathname));
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+
+  if (paths.length) {
+    await deleteBlob(paths, blobOptions());
   }
 }
 
@@ -496,7 +631,7 @@ export async function saveBlog(runId: string, blog: GeneratedBlog) {
   };
 
   await writeJson(runId, "blog.json", record);
-  await writeFile(filePath(runId, "blog.md"), blog.markdown, "utf8");
+  await writeTextFile(runId, "blog.md", blog.markdown);
   return record;
 }
 
@@ -849,7 +984,11 @@ export async function deleteLinkedInOAuthStatesForRun(runId: string) {
 
 export async function deleteRun(runId: string) {
   await deleteLinkedInOAuthStatesForRun(runId);
-  await rm(runDir(runId), { recursive: true, force: true });
+  if (USE_BLOB_STORAGE) {
+    await deleteRunBlobs(runId);
+  } else {
+    await rm(runDir(runId), { recursive: true, force: true });
+  }
   return true;
 }
 
@@ -880,6 +1019,10 @@ export async function listRunSummaries(): Promise<RunSummary[]> {
 }
 
 export async function listRuns() {
+  if (USE_BLOB_STORAGE) {
+    return listRunIdsFromBlobs();
+  }
+
   try {
     const entries = await readdir(DATA_ROOT, { withFileTypes: true });
     return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
