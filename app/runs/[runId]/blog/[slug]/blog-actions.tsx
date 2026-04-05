@@ -11,6 +11,12 @@ type Props = {
   canApprove: boolean;
 };
 
+type WorkflowResponse = {
+  runId?: string;
+  linkedinUrl?: string | null;
+  error?: string;
+};
+
 async function postWorkflow(payload: Record<string, unknown>) {
   const response = await fetch("/api/workflow", {
     method: "POST",
@@ -20,7 +26,7 @@ async function postWorkflow(payload: Record<string, unknown>) {
     body: JSON.stringify(payload)
   });
 
-  const data = (await response.json()) as { error?: string };
+  const data = (await response.json()) as WorkflowResponse;
 
   if (!response.ok || data.error) {
     throw new Error(data.error || "Workflow request failed.");
@@ -33,8 +39,6 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
   const router = useRouter();
   const [regenerationComments, setRegenerationComments] = useState("");
   const [approvalNotes, setApprovalNotes] = useState("");
-  const [showRegeneration, setShowRegeneration] = useState(true);
-  const [showApproval, setShowApproval] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<"regenerate-blog" | "approve-blog" | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -101,15 +105,19 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
       try {
         setError(null);
         setActiveAction("approve-blog");
-        await postWorkflow({
+        const data = (await postWorkflow({
           step: "approve-blog",
           runId,
           articleSlug: slug,
           approved,
           comments: approvalNotes.trim()
-        });
+        })) as WorkflowResponse;
         setApprovalNotes("");
-        router.refresh();
+        if (approved) {
+          router.push((data.linkedinUrl || `/runs/${runId}/blog/${slug}/linkedin`) as never);
+        } else {
+          router.refresh();
+        }
       } catch (caughtError) {
         const message = caughtError instanceof Error ? caughtError.message : "Unknown error";
         setError(message);
@@ -119,10 +127,10 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-3">
       <div className="flex flex-wrap gap-3">
         <a
-          className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/25"
+          className="inline-flex items-center justify-center rounded-xl border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/20 dark:text-[#86efac]"
           href={`/runs/${runId}/blog/${slug}`}
           target="_blank"
           rel="noreferrer"
@@ -139,29 +147,24 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
         />
       ) : null}
 
-      <section className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
-        <div className="flex items-start justify-between gap-4 max-md:flex-col">
+      <details className="rounded-[12px] border border-black/10 bg-white/85 shadow-[0_10px_24px_rgba(15,23,42,0.04)] transition open:shadow-[0_16px_32px_rgba(15,23,42,0.07)] dark:border-white/8 dark:bg-[#121318]">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-3 rounded-[12px] px-4 py-3 text-left [&::-webkit-details-marker]:hidden">
           <div>
-            <h4 className="text-base font-semibold text-neutral-900">Approval process</h4>
-            <p className="mt-1 text-sm text-neutral-600">Approve the current draft or send it back with notes.</p>
+            <h4 className="text-sm font-semibold text-neutral-900 dark:text-zinc-50">Approval process</h4>
+            <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-zinc-400">Approve the draft or send it back with notes.</p>
           </div>
-          <button
-            className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/25"
-            type="button"
-            onClick={() => setShowApproval((current) => !current)}
-          >
-            {showApproval ? "Hide" : "Show"}
-          </button>
-        </div>
-
-        {showApproval ? (
-          <div className="mt-4 grid gap-4">
+            <span className="rounded-full border border-black/10 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500 dark:border-white/10 dark:bg-white/8 dark:text-zinc-400">
+              Review
+            </span>
+        </summary>
+        <div className="border-t border-black/10 px-4 py-4 dark:border-white/8">
+          <div className="grid gap-4">
             <div className="grid gap-2">
-              <label className="text-sm font-semibold text-neutral-800" htmlFor="approval-notes">
+              <label className="text-sm font-semibold text-neutral-800 dark:text-zinc-200" htmlFor="approval-notes">
                 Approval notes
               </label>
               <textarea
-                className="min-h-24 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-neutral-900 outline-none transition focus:border-[#c35d2e] focus:ring-2 focus:ring-[#c35d2e]/20"
+                className="min-h-24 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-neutral-900 outline-none transition focus:border-[#0f7b49] focus:ring-2 focus:ring-[#0f7b49]/20 dark:border-white/8 dark:bg-[#0f1115] dark:text-zinc-100"
                 id="approval-notes"
                 name="approvalNotes"
                 autoComplete="off"
@@ -173,7 +176,7 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
 
             <div className="flex flex-wrap gap-3">
               <button
-                className="inline-flex items-center justify-center rounded-full bg-[#c35d2e] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#b65228] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/30 disabled:cursor-progress disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-xl bg-[#0f172a] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#111827] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/30 disabled:cursor-progress disabled:opacity-60 dark:bg-[#0f7b49] dark:hover:bg-[#0c6a3f]"
                 type="button"
                 onClick={() => submitApproval(true)}
                 disabled={isPending || activeAction === "approve-blog" || !canApprove}
@@ -181,7 +184,7 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
                 {activeAction === "approve-blog" ? "Saving…" : "Approve for publish"}
               </button>
               <button
-                className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-5 py-3 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/25 disabled:cursor-progress disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white/70 px-5 py-3 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/20 disabled:cursor-progress disabled:opacity-60 dark:border-white/10 dark:bg-white/8 dark:text-zinc-200"
                 type="button"
                 onClick={() => submitApproval(false)}
                 disabled={isPending || activeAction === "approve-blog"}
@@ -190,35 +193,30 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
               </button>
             </div>
             {!canApprove ? (
-              <p className="text-sm text-neutral-600">Quality gate must pass before publish approval is enabled.</p>
+              <p className="text-sm text-neutral-600 dark:text-zinc-400">Quality gate must pass before publish approval is enabled.</p>
             ) : null}
           </div>
-        ) : null}
-      </section>
-
-      <section className="rounded-3xl border border-black/10 bg-[#fffaf2] p-4">
-        <div className="flex items-start justify-between gap-4 max-md:flex-col">
-          <div>
-            <h4 className="text-base font-semibold text-neutral-900">Regenerate blog</h4>
-            <p className="mt-1 text-sm text-neutral-600">Add editorial notes for the next rewrite pass.</p>
-          </div>
-          <button
-            className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/25"
-            type="button"
-            onClick={() => setShowRegeneration((current) => !current)}
-          >
-            {showRegeneration ? "Hide" : "Show"}
-          </button>
         </div>
+      </details>
 
-        {showRegeneration ? (
-          <div className="mt-4 grid gap-4">
+      <details className="rounded-[12px] border border-black/10 bg-white/85 shadow-[0_10px_24px_rgba(15,23,42,0.04)] transition open:shadow-[0_16px_32px_rgba(15,23,42,0.07)] dark:border-white/8 dark:bg-[#121318]">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-3 rounded-[12px] px-4 py-3 text-left [&::-webkit-details-marker]:hidden">
+          <div>
+            <h4 className="text-sm font-semibold text-neutral-900 dark:text-zinc-50">Regenerate blog</h4>
+            <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-zinc-400">Add editorial notes for the next rewrite pass.</p>
+          </div>
+            <span className="rounded-full border border-black/10 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500 dark:border-white/10 dark:bg-white/8 dark:text-zinc-400">
+              Rewrite
+            </span>
+        </summary>
+        <div className="border-t border-black/10 px-4 py-4 dark:border-white/8">
+          <div className="grid gap-4">
             <div className="grid gap-2">
-              <label className="text-sm font-semibold text-neutral-800" htmlFor="regen-comments">
+              <label className="text-sm font-semibold text-neutral-800 dark:text-zinc-200" htmlFor="regen-comments">
                 Regeneration comments
               </label>
               <textarea
-                className="min-h-24 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-neutral-900 outline-none transition focus:border-[#c35d2e] focus:ring-2 focus:ring-[#c35d2e]/20"
+                className="min-h-24 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-neutral-900 outline-none transition focus:border-[#0f7b49] focus:ring-2 focus:ring-[#0f7b49]/20 dark:border-white/8 dark:bg-[#0f1115] dark:text-zinc-100"
                 id="regen-comments"
                 name="regenerationComments"
                 autoComplete="off"
@@ -230,7 +228,7 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
             {error ? <p className="text-sm text-red-700">{error}</p> : null}
             <div className="flex flex-wrap gap-3">
               <button
-                className="inline-flex items-center justify-center rounded-full bg-[#c35d2e] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#b65228] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/30 disabled:cursor-progress disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-xl bg-[#0f172a] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#111827] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/30 disabled:cursor-progress disabled:opacity-60 dark:bg-[#0f7b49] dark:hover:bg-[#0c6a3f]"
                 type="button"
                 onClick={submitRegeneration}
                 disabled={isPending || activeAction === "regenerate-blog"}
@@ -239,8 +237,8 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
               </button>
             </div>
           </div>
-        ) : null}
-      </section>
+        </div>
+      </details>
     </div>
   );
 }

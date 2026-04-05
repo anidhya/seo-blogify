@@ -4,7 +4,13 @@ export type WorkflowStep =
   | "generate-blog"
   | "update-blog"
   | "regenerate-blog"
-  | "approve-blog";
+  | "approve-blog"
+  | "prepare-linkedin"
+  | "queue-linkedin-images"
+  | "generate-linkedin-images"
+  | "approve-linkedin"
+  | "schedule-linkedin"
+  | "publish-linkedin";
 
 export type WorkflowInput = {
   websiteUrl: string;
@@ -134,6 +140,101 @@ export type ApprovedArticle = {
   wordCount: number;
   approvalStatus: "pending" | "approved" | "needs_revision";
   feedbackCount: number;
+};
+
+export type LinkedInCarouselPrompt = {
+  slideNumber: number;
+  title: string;
+  prompt: string;
+  designNotes: string;
+};
+
+export type LinkedInGeneratedImage = {
+  slideNumber: number;
+  prompt: string;
+  imageDataUrl: string;
+  mimeType: string;
+  model: string;
+  generatedAt: string;
+  renderMode: "google-image" | "preview";
+  providerResponseText: string | null;
+};
+
+export type LinkedInSlideFailure = {
+  slideNumber: number;
+  reason: string;
+  failedAt: string;
+};
+
+export type LinkedInDraft = {
+  articleSlug: string;
+  suggestedTitle: string;
+  suggestedDescription: string;
+  carouselPrompts: LinkedInCarouselPrompt[];
+  generatedImages: LinkedInGeneratedImage[];
+  failedSlides: LinkedInSlideFailure[];
+  imageGenerationStatus: "idle" | "pending" | "queued" | "generating" | "partial" | "ready" | "failed";
+  imageModel: string | null;
+  hashtags: string[];
+  callToAction: string;
+  publishStatus: "draft" | "ready" | "scheduled" | "published" | "failed";
+  reviewStatus: "draft" | "pending_review" | "approved" | "needs_revision";
+};
+
+export type LinkedInConnection = {
+  connected: boolean;
+  connectedAt: string | null;
+  updatedAt: string;
+  memberUrn: string | null;
+  memberName: string | null;
+  accessToken: string | null;
+  expiresAt: string | null;
+};
+
+export type LinkedInApproval = {
+  approvalId: string;
+  createdAt: string;
+  approved: boolean;
+  notes: string;
+};
+
+export type LinkedInSchedule = {
+  scheduleId: string;
+  createdAt: string;
+  scheduledFor: string;
+  timezone: string;
+  status: "scheduled" | "published" | "cancelled";
+  publishedAt: string | null;
+  notes: string;
+};
+
+export type LinkedInPublication = {
+  publicationId: string;
+  createdAt: string;
+  publishedAt: string | null;
+  postUrn: string | null;
+  externalUrl: string | null;
+  status: "draft" | "published" | "failed";
+  error: string | null;
+};
+
+export type LinkedInRecord = {
+  articleSlug: string;
+  createdAt: string;
+  updatedAt: string;
+  draft: LinkedInDraft | null;
+  connection: LinkedInConnection | null;
+  approvals: LinkedInApproval[];
+  schedule: LinkedInSchedule | null;
+  publication: LinkedInPublication | null;
+};
+
+export type LinkedInArticlesRecord = {
+  runId: string;
+  schemaVersion: "1";
+  createdAt: string;
+  updatedAt: string;
+  articles: LinkedInRecord[];
 };
 
 export type WorkflowProgress = {

@@ -19,6 +19,17 @@ function CopyIcon() {
   );
 }
 
+function CheckIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4">
+      <path
+        fill="currentColor"
+        d="M9.2 16.2 4.9 12l-1.4 1.4 5.7 5.7L20.5 7.8 19.1 6.4 9.2 16.2Z"
+      />
+    </svg>
+  );
+}
+
 export default function CopyButton({ text, label, ariaLabel }: Props) {
   const [copied, setCopied] = useState(false);
 
@@ -34,14 +45,16 @@ export default function CopyButton({ text, label, ariaLabel }: Props) {
 
   return (
     <button
-      className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c35d2e]/25"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white/80 text-neutral-700 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/8"
       type="button"
-      onClick={handleCopy}
+      onClick={(event) => {
+        event.stopPropagation();
+        void handleCopy();
+      }}
       aria-label={ariaLabel ?? label}
-      title={label}
+      title={copied ? "Copied" : label}
     >
-      <CopyIcon />
-      <span>{copied ? "Copied" : label}</span>
+      {copied ? <CheckIcon /> : <CopyIcon />}
     </button>
   );
 }
