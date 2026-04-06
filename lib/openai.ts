@@ -143,7 +143,6 @@ export async function generateStructuredAnalysis(prompt: string) {
   const client = getClient();
   const response = await client.responses.parse({
     model: defaultModel,
-    reasoning: { effort: "medium" },
     input: [
       {
         role: "developer",
@@ -176,7 +175,6 @@ export async function generateTopicSuggestions(prompt: string, count = 10) {
 
   const response = await client.responses.parse({
     model: defaultModel,
-    reasoning: { effort: "medium" },
     tools,
     input: [
       {
@@ -207,7 +205,6 @@ export async function generateApprovedBlog(prompt: string) {
   const client = getClient();
   const response = await client.responses.parse({
     model: defaultModel,
-    reasoning: { effort: "medium" },
     input: [
       {
         role: "developer",
@@ -237,7 +234,6 @@ export async function evaluateBlogQuality(prompt: string) {
   const client = getClient();
   const response = await client.responses.parse({
     model: defaultModel,
-    reasoning: { effort: "low" },
     input: [
       {
         role: "developer",
@@ -267,7 +263,6 @@ export async function rewriteBlogDraft(prompt: string) {
   const client = getClient();
   const response = await client.responses.parse({
     model: defaultModel,
-    reasoning: { effort: "medium" },
     input: [
       {
         role: "developer",
@@ -297,7 +292,6 @@ export async function generateLinkedInDraft(prompt: string) {
   const client = getClient();
   const response = await client.responses.parse({
     model: defaultModel,
-    reasoning: { effort: "medium" },
     input: [
       {
         role: "developer",

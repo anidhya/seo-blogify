@@ -810,6 +810,17 @@ export async function POST(request: Request) {
       });
     }
 
+    if (step === "update-analysis") {
+      const runId = body.runId;
+      const analysis = body.analysis as BrandAnalysis | undefined;
+      if (!runId || !analysis) {
+        return NextResponse.json({ error: "runId and analysis are required." }, { status: 400 });
+      }
+      await saveAnalysis(runId, analysis);
+      await updateManifest(runId, { status: "analyzed" });
+      return NextResponse.json({ runId, ok: true });
+    }
+
     if (step === "update-blog") {
       const runId = body.runId;
       const markdown = body.markdown?.trim();

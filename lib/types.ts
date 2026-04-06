@@ -1,5 +1,6 @@
 export type WorkflowStep =
   | "analyze"
+  | "update-analysis"
   | "suggest-topics"
   | "generate-blog"
   | "update-blog"

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npm --version)",
+      "Read(//usr/local/bin/**)",
+      "Read(//opt/homebrew/**)",
+      "Bash(ls /usr/local/bin/npm*)",
+      "Bash(ls /usr/local/bin/npx*)",
+      "Bash(/usr/local/bin/npm install:*)",
+      "Bash(/usr/local/bin/node /usr/local/bin/npm install)",
+      "Bash(PATH=/usr/local/bin:$PATH /usr/local/bin/node /usr/local/bin/npm install)",
+      "Bash(/Applications/XAMPP/xamppfiles/htdocs/seo/seo-blogify/.env.local:*)"
+    ]
+  }
+}

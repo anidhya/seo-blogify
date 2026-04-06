@@ -15,41 +15,34 @@
   color-scheme: light;
   --font-headline: "Plus Jakarta Sans", "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "DM Sans", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --bg: #edf3ee;
-  --panel: rgba(249, 252, 249, 0.92);
-  --panel-strong: rgba(255, 255, 255, 0.96);
+  --bg: #f6f9f6;
+  --panel: rgba(255, 255, 255, 0.95);
+  --panel-strong: #ffffff;
   --ink: #0f172a;
   --muted: #475569;
   --line: rgba(15, 23, 42, 0.08);
   --accent: #0f172a;
-  --accent-soft: rgba(15, 23, 42, 0.08);
+  --accent-soft: rgba(15, 23, 42, 0.06);
   --success: #0f7b49;
-  --shadow: 0 18px 44px rgba(15, 23, 42, 0.06);
+  --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.04);
   --font-display: var(--font-headline);
   --font-body: var(--font-sans);
-  --page-bg:
-    radial-gradient(circle at top left, rgba(15, 123, 73, 0.12), transparent 24%),
-    radial-gradient(circle at top right, rgba(15, 23, 42, 0.05), transparent 18%),
-    radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.06), transparent 20%),
-    linear-gradient(180deg, #f7faf7 0%, #eef3ee 38%, #e3ebe3 100%);
+  --page-bg: #f6f9f6;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0f1210;
-  --panel: rgba(22, 25, 23, 0.88);
-  --panel-strong: rgba(27, 30, 28, 0.96);
+  --bg: #0f1011;
+  --panel: rgba(20, 21, 24, 0.95);
+  --panel-strong: #1a1b1f;
   --ink: #f4f4f5;
   --muted: #a1a1aa;
   --line: rgba(255, 255, 255, 0.08);
   --accent: #0f7b49;
-  --accent-soft: rgba(15, 123, 73, 0.16);
+  --accent-soft: rgba(15, 123, 73, 0.14);
   --success: #22c55e;
-  --shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
-  --page-bg:
-    radial-gradient(circle at top left, rgba(15, 123, 73, 0.14), transparent 28%),
-    radial-gradient(circle at top right, rgba(139, 92, 246, 0.12), transparent 22%),
-    linear-gradient(180deg, #121613 0%, var(--bg) 100%);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2);
+  --page-bg: #0f1011;
 }
 
 * {
@@ -233,15 +226,13 @@ textarea {
   background: var(--panel);
   border-radius: 16px;
   box-shadow: var(--shadow);
-  backdrop-filter: blur(18px);
 }
 
 .surface-shell {
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(249, 252, 249, 0.9), rgba(241, 246, 241, 0.88));
+  background: var(--panel);
   border-radius: 16px;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.04);
-  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow);
 }
 
 .surface-card {

@@ -164,7 +164,13 @@ export default async function BlogPreviewPage({ params }: PageProps) {
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_320px]">
           <div className="grid gap-4">
-            <EditableArticleCard runId={runId} articleSlug={slug} markdown={blog.markdown} />
+            <EditableArticleCard
+              runId={runId}
+              articleSlug={slug}
+              markdown={blog.markdown}
+              imagePrompts={blog.imagePrompts}
+              internalLinks={blog.internalLinks}
+            />
           </div>
 
           <aside className="grid gap-4 xl:sticky xl:top-4 self-start">
