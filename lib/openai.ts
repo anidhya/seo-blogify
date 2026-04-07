@@ -143,6 +143,7 @@ export async function generateStructuredAnalysis(prompt: string) {
   const client = getClient();
   const response = await client.responses.parse({
     model: defaultModel,
+    temperature: 0.2, // low — factual extraction, consistent structured output
     input: [
       {
         role: "developer",
@@ -175,6 +176,7 @@ export async function generateTopicSuggestions(prompt: string, count = 10) {
 
   const response = await client.responses.parse({
     model: defaultModel,
+    temperature: 0.7, // higher — diverse, creative topic ideas
     tools,
     input: [
       {
@@ -205,6 +207,7 @@ export async function generateApprovedBlog(prompt: string) {
   const client = getClient();
   const response = await client.responses.parse({
     model: defaultModel,
+    temperature: 0.7, // higher — natural, varied blog writing
     input: [
       {
         role: "developer",
@@ -234,6 +237,7 @@ export async function evaluateBlogQuality(prompt: string) {
   const client = getClient();
   const response = await client.responses.parse({
     model: defaultModel,
+    temperature: 0.1, // very low — deterministic scoring, consistent quality gates
     input: [
       {
         role: "developer",
@@ -263,6 +267,7 @@ export async function rewriteBlogDraft(prompt: string) {
   const client = getClient();
   const response = await client.responses.parse({
     model: defaultModel,
+    temperature: 0.5, // balanced — targeted edits, not too random, not too rigid
     input: [
       {
         role: "developer",
@@ -292,6 +297,7 @@ export async function generateLinkedInDraft(prompt: string) {
   const client = getClient();
   const response = await client.responses.parse({
     model: defaultModel,
+    temperature: 0.6, // moderate — engaging copy with some creativity
     input: [
       {
         role: "developer",
