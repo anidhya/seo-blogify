@@ -110,6 +110,47 @@ const linkedInDraftSchema = z.object({
   reviewStatus: z.enum(["draft", "pending_review", "approved", "needs_revision"])
 });
 
+const socialResearchSchema = z.object({
+  sourceSummary: z.string(),
+  audience: z.string(),
+  keyInsights: z.array(z.string()).min(3).max(8),
+  references: z.array(
+    z.object({
+      label: z.string(),
+      url: z.string(),
+      summary: z.string()
+    })
+  ),
+  recommendedAngles: z.array(z.string()).min(3).max(8),
+  researchedAt: z.string()
+});
+
+const socialVariantSchema = z.object({
+  variantId: z.string(),
+  label: z.string(),
+  format: z.enum(["single", "carousel", "thread"]),
+  title: z.string(),
+  body: z.string(),
+  segments: z.array(z.string()).default([]),
+  hashtags: z.array(z.string()).min(3).max(12),
+  callToAction: z.string(),
+  designNotes: z.array(z.string()).default([])
+});
+
+const socialPlatformDraftSchema = z.object({
+  platform: z.enum(["instagram", "linkedin", "x"]),
+  platformLabel: z.string(),
+  researchSummary: z.string(),
+  recommendedAngles: z.array(z.string()).min(2).max(5),
+  variants: z.array(socialVariantSchema).min(2).max(3)
+});
+
+const socialPackSchema = z.object({
+  projectTitle: z.string(),
+  research: socialResearchSchema,
+  platformDrafts: z.array(socialPlatformDraftSchema).length(3)
+});
+
 const blogQualitySchema = z.object({
   score: z.number().min(0).max(100),
   publishStatus: z.enum(["publish_ready", "needs_review"]),
@@ -318,6 +359,39 @@ export async function generateLinkedInDraft(prompt: string) {
 
   if (!parsed) {
     throw new Error("Failed to parse LinkedIn draft.");
+  }
+
+  return parsed;
+}
+
+export async function generateSocialContentPack(prompt: string) {
+  const client = getClient();
+  const tools = process.env.OPENAI_ENABLE_WEB_SEARCH === "false" ? [] : [{ type: "web_search_preview" as const }];
+
+  const response = await client.responses.parse({
+    model: defaultModel,
+    temperature: 0.55,
+    tools,
+    input: [
+      {
+        role: "developer",
+        content:
+          "You are a senior social content strategist. Research the source carefully and produce platform-specific drafts for Instagram, LinkedIn, and X. Keep the output concise, evidence-backed, and ready for editing."
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    text: {
+      format: zodTextFormat(socialPackSchema, "social_content_pack")
+    }
+  });
+
+  const parsed = response.output_parsed;
+
+  if (!parsed) {
+    throw new Error("Failed to parse social content pack.");
   }
 
   return parsed;

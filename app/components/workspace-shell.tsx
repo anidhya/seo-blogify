@@ -5,7 +5,22 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useTheme } from "./theme-provider";
 
-type NavIcon = "back" | "sync" | "analysis" | "topics" | "articles" | "preview" | "linkedin" | "publish" | "plus" | "settings" | "sun" | "moon";
+type NavIcon =
+  | "back"
+  | "sync"
+  | "analysis"
+  | "topics"
+  | "articles"
+  | "preview"
+  | "linkedin"
+  | "instagram"
+  | "x"
+  | "social"
+  | "publish"
+  | "plus"
+  | "settings"
+  | "sun"
+  | "moon";
 
 type NavItem = {
   label: string;
@@ -80,6 +95,29 @@ function Icon({ icon }: { icon: NavIcon }) {
           <path d="M6.5 6.5h.01" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
           <path d="M10 18V9.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
           <path d="M10 13c0-2 1-3.5 3-3.5s3 1.2 3 3.5V18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case "instagram":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className={cls}>
+          <rect x="5" y="5" width="14" height="14" rx="4" stroke="currentColor" strokeWidth="1.8" />
+          <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.8" />
+          <circle cx="16.8" cy="7.2" r="1" fill="currentColor" />
+        </svg>
+      );
+    case "x":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className={cls}>
+          <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+        </svg>
+      );
+    case "social":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className={cls}>
+          <circle cx="7" cy="12" r="2.2" stroke="currentColor" strokeWidth="1.8" />
+          <circle cx="17" cy="7.2" r="2.2" stroke="currentColor" strokeWidth="1.8" />
+          <circle cx="17" cy="16.8" r="2.2" stroke="currentColor" strokeWidth="1.8" />
+          <path d="M8.8 11.2 15.1 8M8.8 12.8l6.3 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       );
     case "publish":

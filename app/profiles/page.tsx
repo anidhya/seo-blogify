@@ -27,7 +27,7 @@ function timeAgo(dateStr?: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function StatusBadge({ status }: { status?: string }) {
+function StatusBadge({ status }: { status?: string | null }) {
   if (status === "publish_ready") return (
     <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
       Ready
