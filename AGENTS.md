@@ -15,6 +15,7 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 
 - Install dependencies: `npm install`
 - Start dev server: `npm run dev`
+- Start production server after a build: `npm run start`
 - Lint: `npm run lint`
 - Typecheck: `npm run typecheck`
 - Production build: `npm run build`
@@ -58,4 +59,5 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 
 - Run the smallest relevant check first, usually `npm run lint` or `npm run typecheck`.
 - If you changed a user-facing flow, verify the affected route locally if possible.
+- If you need local workflow data, copy `.env.example` to `.env.local` before starting the app.
 - Summarize the files changed and any follow-up validation that is still needed.
