@@ -241,6 +241,134 @@ export const linkedInArticlesRecordSchema = z.object({
   articles: z.array(linkedInRecordSchema)
 });
 
+export const socialSourceSchema = z.object({
+  mode: z.enum(["url", "manual"]),
+  url: z.string().nullable(),
+  topic: z.string(),
+  audience: z.string(),
+  notes: z.string(),
+  seedRunId: z.string().nullable(),
+  seedArticleSlug: z.string().nullable(),
+  seedArticleTitle: z.string().nullable(),
+  seedArticleSummary: z.string().nullable()
+});
+
+export const socialResearchReferenceSchema = z.object({
+  label: z.string(),
+  url: z.string(),
+  summary: z.string()
+});
+
+export const socialResearchSchema = z.object({
+  sourceSummary: z.string(),
+  audience: z.string(),
+  keyInsights: z.array(z.string()).min(3).max(8),
+  references: z.array(socialResearchReferenceSchema),
+  recommendedAngles: z.array(z.string()).min(3).max(8),
+  researchedAt: z.string()
+});
+
+export const socialVariantSchema = z.object({
+  variantId: z.string(),
+  label: z.string(),
+  format: z.enum(["single", "carousel", "thread"]),
+  title: z.string(),
+  body: z.string(),
+  segments: z.array(z.string()).default([]),
+  hashtags: z.array(z.string()).min(3).max(12),
+  callToAction: z.string(),
+  designNotes: z.array(z.string()).default([]),
+  createdAt: z.string(),
+  updatedAt: z.string()
+});
+
+export const socialCommentSchema = z.object({
+  commentId: z.string(),
+  createdAt: z.string(),
+  text: z.string(),
+  resolved: z.boolean()
+});
+
+export const socialEditSchema = z.object({
+  editId: z.string(),
+  createdAt: z.string(),
+  variantId: z.string(),
+  before: z.string(),
+  after: z.string(),
+  note: z.string()
+});
+
+export const socialConnectionSchema = z.object({
+  connected: z.boolean(),
+  connectedAt: z.string().nullable(),
+  updatedAt: z.string(),
+  accountName: z.string().nullable(),
+  handle: z.string().nullable(),
+  provider: z.enum(["instagram", "linkedin", "x"]),
+  accountId: z.string().nullable().optional().default(null),
+  accessToken: z.string().nullable().optional().default(null),
+  refreshToken: z.string().nullable().optional().default(null),
+  tokenExpiresAt: z.string().nullable().optional().default(null),
+  scope: z.string().nullable().optional().default(null),
+  pageId: z.string().nullable().optional().default(null),
+  instagramBusinessAccountId: z.string().nullable().optional().default(null),
+  profileUrl: z.string().nullable().optional().default(null)
+});
+
+export const socialScheduleSchema = z.object({
+  scheduleId: z.string(),
+  createdAt: z.string(),
+  scheduledFor: z.string(),
+  timezone: z.string(),
+  status: z.enum(["scheduled", "published", "cancelled"]),
+  publishedAt: z.string().nullable(),
+  notes: z.string()
+});
+
+export const socialPublicationSchema = z.object({
+  publicationId: z.string(),
+  createdAt: z.string(),
+  publishedAt: z.string().nullable(),
+  platformPostId: z.string().nullable().optional().default(null),
+  externalUrl: z.string().nullable(),
+  mediaUrl: z.string().nullable().optional().default(null),
+  status: z.enum(["draft", "published", "failed"]),
+  error: z.string().nullable()
+});
+
+export const socialPlatformRecordSchema = z.object({
+  platform: z.enum(["instagram", "linkedin", "x"]),
+  activeVariantId: z.string().nullable(),
+  variants: z.array(socialVariantSchema),
+  comments: z.array(socialCommentSchema),
+  editHistory: z.array(socialEditSchema),
+  connection: socialConnectionSchema.nullable(),
+  schedule: socialScheduleSchema.nullable(),
+  publication: socialPublicationSchema.nullable(),
+  updatedAt: z.string()
+});
+
+export const socialProjectSchema = z.object({
+  projectId: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  title: z.string(),
+  source: socialSourceSchema,
+  research: socialResearchSchema.nullable(),
+  platforms: z.array(socialPlatformRecordSchema).length(3),
+  notes: z.string()
+});
+
+export const socialOAuthStateSchema = z.object({
+  state: z.string(),
+  projectId: z.string(),
+  platform: z.enum(["instagram", "linkedin", "x"]),
+  createdAt: z.string(),
+  expiresAt: z.string(),
+  redirectUri: z.string(),
+  codeVerifier: z.string().nullable().optional().default(null)
+});
+
 export const approvedArticleSchema = z.object({
   articleId: z.string(),
   articleSlug: z.string(),

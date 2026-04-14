@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import BlogActions from "./blog-actions";
 import CopyButton from "./copy-button";
 import EditableArticleCard from "./editable-article-card";
+import SocialHandoffButton from "./social-handoff-button";
 import WorkspaceShell from "@/app/components/workspace-shell";
 
 export const dynamic = "force-dynamic";
@@ -112,12 +113,15 @@ export default async function BlogPreviewPage({ params }: PageProps) {
             Back to workspace
           </a>
           {latestApproval?.approved ? (
-            <a
-              className="inline-flex items-center justify-center rounded-xl border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:text-[#86efac]"
-              href={`/runs/${runId}/blog/${slug}/linkedin`}
-            >
-              Open LinkedIn workflow
-            </a>
+            <>
+              <SocialHandoffButton runId={runId} slug={slug} />
+              <a
+                className="inline-flex items-center justify-center rounded-xl border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:text-[#86efac]"
+                href={`/runs/${runId}/blog/${slug}/linkedin`}
+              >
+                Open LinkedIn workflow
+              </a>
+            </>
           ) : null}
         </div>
       }
@@ -193,8 +197,11 @@ export default async function BlogPreviewPage({ params }: PageProps) {
                 </p>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                {blog.meta.keywords.map((keyword) => (
-                  <span className="rounded-full bg-[#0f7b49]/10 px-3 py-1 text-xs font-medium text-[#0f7b49] dark:bg-white/10 dark:text-[#86efac]" key={keyword}>
+                {blog.meta.keywords.map((keyword, index) => (
+                  <span
+                    className="rounded-full bg-[#0f7b49]/10 px-3 py-1 text-xs font-medium text-[#0f7b49] dark:bg-white/10 dark:text-[#86efac]"
+                    key={`${keyword}-${index}`}
+                  >
                     {keyword}
                   </span>
                 ))}

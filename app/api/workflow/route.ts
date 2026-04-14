@@ -61,6 +61,7 @@ type RequestBody = {
   comments?: string;
   approved?: boolean;
   markdown?: string;
+  analysis?: BrandAnalysis;
   payload?: WorkflowInput & {
     analysis?: BrandAnalysis;
     selectedTopic?: TopicSuggestion;

@@ -9,6 +9,7 @@ The app is intentionally not a generic SaaS layout. It uses a separate left rail
 ## Product Areas
 
 - Landing: brand sync entry point with quick setup and progress feedback
+- Social Studio landing: source selection, recent projects, and platform-aware content creation
 - Profiles: saved runs grouped by website domain
 - FAQ: short answers in expandable cards
 - Run workspace: analysis, topic queue, and article generation
@@ -156,6 +157,16 @@ Avoid stacked card shadows and heavy drop shadows.
 - Advanced fields should be hidden behind a progressive disclosure toggle.
 - Show analysis progress directly under the form.
 - Keep the primary CTA large, navy, and text-first.
+- Add a secondary social-content path so the root page works as a gateway between blog and social workflows.
+
+### Social Studio
+
+- Treat Social Studio as a separate product entry that still shares the same shell.
+- Keep the source picker compact, with a clear distinction between URL-based and manual-topic inputs.
+- Surface the research summary above the platform cards so the draft set feels grounded.
+- Use platform cards with clear editing, comments, connection, and scheduling controls.
+- Instagram and LinkedIn can use purple accents for carousel variants; X should stay neutral and text-forward.
+- Use a split preview-and-details content editor modal for deep draft editing, with the preview on the left and the editable fields on the right.
 
 ### Profiles
 
@@ -253,4 +264,3 @@ Avoid stacked card shadows and heavy drop shadows.
 - Article preview: editor-like surface with deep disclosure panels
 - LinkedIn page: purple-tinted workflow cards, image generation, OAuth, schedule, publish
 - Loading states: soft skeleton surfaces matched to the current shell
-

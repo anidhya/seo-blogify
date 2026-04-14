@@ -5,7 +5,7 @@ import { ThemeProvider } from "./components/theme-provider";
 
 export const metadata: Metadata = {
   title: "Marketier AI 0.1",
-  description: "AI workflow for brand-aware blog research, topic ideation, and blog generation."
+  description: "AI workflow for brand-aware blog research, social content generation, topic ideation, and blog drafting."
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
