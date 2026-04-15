@@ -1,5 +1,6 @@
 export type WorkflowStep =
   | "analyze"
+  | "update-analysis"
   | "suggest-topics"
   | "generate-blog"
   | "update-blog"
@@ -235,6 +236,149 @@ export type LinkedInArticlesRecord = {
   createdAt: string;
   updatedAt: string;
   articles: LinkedInRecord[];
+};
+
+export type SocialSourceMode = "url" | "manual";
+export type SocialPlatform = "instagram" | "linkedin" | "x";
+export type SocialVariantFormat = "single" | "carousel" | "thread";
+
+export type SocialSource = {
+  mode: SocialSourceMode;
+  url: string | null;
+  topic: string;
+  audience: string;
+  notes: string;
+  seedRunId: string | null;
+  seedArticleSlug: string | null;
+  seedArticleTitle: string | null;
+  seedArticleSummary: string | null;
+};
+
+export type SocialResearchReference = {
+  label: string;
+  url: string;
+  summary: string;
+};
+
+export type SocialResearch = {
+  sourceSummary: string;
+  audience: string;
+  keyInsights: string[];
+  references: SocialResearchReference[];
+  recommendedAngles: string[];
+  researchedAt: string;
+};
+
+export type SocialVariant = {
+  variantId: string;
+  label: string;
+  format: SocialVariantFormat;
+  title: string;
+  body: string;
+  segments: string[];
+  hashtags: string[];
+  callToAction: string;
+  designNotes: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SocialComment = {
+  commentId: string;
+  createdAt: string;
+  text: string;
+  resolved: boolean;
+};
+
+export type SocialEdit = {
+  editId: string;
+  createdAt: string;
+  variantId: string;
+  before: string;
+  after: string;
+  note: string;
+};
+
+export type SocialConnection = {
+  connected: boolean;
+  connectedAt: string | null;
+  updatedAt: string;
+  accountName: string | null;
+  handle: string | null;
+  provider: SocialPlatform;
+  accountId: string | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  tokenExpiresAt: string | null;
+  scope: string | null;
+  pageId: string | null;
+  instagramBusinessAccountId: string | null;
+  profileUrl: string | null;
+};
+
+export type SocialSchedule = {
+  scheduleId: string;
+  createdAt: string;
+  scheduledFor: string;
+  timezone: string;
+  status: "scheduled" | "published" | "cancelled";
+  publishedAt: string | null;
+  notes: string;
+};
+
+export type SocialPublication = {
+  publicationId: string;
+  createdAt: string;
+  publishedAt: string | null;
+  platformPostId: string | null;
+  externalUrl: string | null;
+  mediaUrl: string | null;
+  status: "draft" | "published" | "failed";
+  error: string | null;
+};
+
+export type SocialPlatformRecord = {
+  platform: SocialPlatform;
+  activeVariantId: string | null;
+  variants: SocialVariant[];
+  comments: SocialComment[];
+  editHistory: SocialEdit[];
+  connection: SocialConnection | null;
+  schedule: SocialSchedule | null;
+  publication: SocialPublication | null;
+  updatedAt: string;
+};
+
+export type SocialProject = {
+  projectId: string;
+  createdAt: string;
+  updatedAt: string;
+  title: string;
+  source: SocialSource;
+  research: SocialResearch | null;
+  platforms: SocialPlatformRecord[];
+  notes: string;
+};
+
+export type SocialProjectSummary = {
+  projectId: string;
+  title: string;
+  updatedAt: string;
+  sourceLabel: string;
+  sourceMode: SocialSourceMode;
+  platformCount: number;
+  readyCount: number;
+  scheduledCount: number;
+};
+
+export type SocialOAuthState = {
+  state: string;
+  projectId: string;
+  platform: SocialPlatform;
+  createdAt: string;
+  expiresAt: string;
+  redirectUri: string;
+  codeVerifier?: string | null;
 };
 
 export type WorkflowProgress = {

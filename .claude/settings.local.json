@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npm --version)",
+      "Read(//usr/local/bin/**)",
+      "Read(//opt/homebrew/**)",
+      "Bash(ls /usr/local/bin/npm*)",
+      "Bash(ls /usr/local/bin/npx*)",
+      "Bash(/usr/local/bin/npm install:*)",
+      "Bash(/usr/local/bin/node /usr/local/bin/npm install)",
+      "Bash(PATH=/usr/local/bin:$PATH /usr/local/bin/node /usr/local/bin/npm install)",
+      "Bash(/Applications/XAMPP/xamppfiles/htdocs/seo/seo-blogify/.env.local:*)",
+      "Bash(git -C /Applications/XAMPP/xamppfiles/htdocs/seo/seo-blogify status)",
+      "Bash(git -C /Applications/XAMPP/xamppfiles/htdocs/seo/seo-blogify log --oneline -5)",
+      "Bash(git -C /Applications/XAMPP/xamppfiles/htdocs/seo/seo-blogify diff --stat HEAD)",
+      "Bash(git -C /Applications/XAMPP/xamppfiles/htdocs/seo/seo-blogify add app/ lib/)",
+      "Bash(git -C /Applications/XAMPP/xamppfiles/htdocs/seo/seo-blogify diff main..romit-ui --name-only)",
+      "Bash(git -C /Applications/XAMPP/xamppfiles/htdocs/seo/seo-blogify push origin romit-ui)",
+      "Bash(git -C /Applications/XAMPP/xamppfiles/htdocs/seo/seo-blogify log origin/romit-ui..romit-ui --oneline)",
+      "Bash(git -C /Applications/XAMPP/xamppfiles/htdocs/seo/seo-blogify add .claude/launch.json)",
+      "Bash(git -C:*)"
+    ]
+  }
+}

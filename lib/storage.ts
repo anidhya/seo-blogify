@@ -18,6 +18,8 @@ import {
   linkedInRecordSchema,
   linkedInArticlesRecordSchema,
   linkedInScheduleSchema,
+  socialProjectSchema,
+  socialOAuthStateSchema,
   manifestSchema,
   pageSnapshotSchema,
   researchSchema,
@@ -49,7 +51,10 @@ import type {
   LinkedInPublication,
   LinkedInRecord,
   LinkedInArticlesRecord,
-  LinkedInSchedule
+  LinkedInSchedule,
+  SocialProject,
+  SocialOAuthState,
+  SocialProjectSummary
 } from "@/lib/types";
 
 const STORAGE_ROOT = process.env.DATA_ROOT
@@ -59,6 +64,7 @@ const STORAGE_ROOT = process.env.DATA_ROOT
     : path.join(process.cwd(), "data");
 const DATA_ROOT = path.join(STORAGE_ROOT, "runs");
 const LINKEDIN_ROOT = path.join(STORAGE_ROOT, "linkedin");
+const SOCIAL_ROOT = path.join(STORAGE_ROOT, "social");
 const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
 const USE_BLOB_STORAGE = Boolean(BLOB_TOKEN);
 const SCHEMA_VERSION = "1" as const;
@@ -316,6 +322,99 @@ async function writeLinkedInJson(fileName: string, value: unknown) {
 
   await ensureLinkedInDir();
   await writeFile(path.join(LINKEDIN_ROOT, fileName), payload, "utf8");
+}
+
+async function ensureSocialDir() {
+  await mkdir(SOCIAL_ROOT, { recursive: true });
+}
+
+async function writeSocialJson(projectId: string, fileName: string, value: unknown) {
+  const payload = JSON.stringify(value, null, 2);
+
+  if (USE_BLOB_STORAGE) {
+    await putBlob(blobPath("social", projectId, fileName), payload, {
+      access: "private",
+      allowOverwrite: true,
+      contentType: "application/json; charset=utf-8",
+      ...blobOptions()
+    });
+    return;
+  }
+
+  await mkdir(path.join(SOCIAL_ROOT, projectId), { recursive: true });
+  await writeFile(path.join(SOCIAL_ROOT, projectId, fileName), payload, "utf8");
+}
+
+async function readSocialRootJson<T>(fileName: string) {
+  if (USE_BLOB_STORAGE) {
+    try {
+      const blob = await getBlob(blobPath("social", fileName), {
+        access: "private",
+        useCache: false,
+        ...blobOptions()
+      });
+
+      if (!blob || blob.statusCode !== 200 || !blob.stream) {
+        return null;
+      }
+
+      const content = await new Response(blob.stream).text();
+      return JSON.parse(content) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    const content = await readFile(path.join(SOCIAL_ROOT, fileName), "utf8");
+    return JSON.parse(content) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function writeSocialRootJson(fileName: string, value: unknown) {
+  const payload = JSON.stringify(value, null, 2);
+
+  if (USE_BLOB_STORAGE) {
+    await putBlob(blobPath("social", fileName), payload, {
+      access: "private",
+      contentType: "application/json; charset=utf-8",
+      ...blobOptions()
+    });
+    return;
+  }
+
+  await mkdir(SOCIAL_ROOT, { recursive: true });
+  await writeFile(path.join(SOCIAL_ROOT, fileName), payload, "utf8");
+}
+
+async function readSocialJson<T>(projectId: string, fileName: string): Promise<T | null> {
+  if (USE_BLOB_STORAGE) {
+    try {
+      const blob = await getBlob(blobPath("social", projectId, fileName), {
+        access: "private",
+        useCache: false,
+        ...blobOptions()
+      });
+
+      if (!blob || blob.statusCode !== 200 || !blob.stream) {
+        return null;
+      }
+
+      const content = await new Response(blob.stream).text();
+      return JSON.parse(content) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    const content = await readFile(path.join(SOCIAL_ROOT, projectId, fileName), "utf8");
+    return JSON.parse(content) as T;
+  } catch {
+    return null;
+  }
 }
 
 async function readLinkedInJson<T>(fileName: string): Promise<T | null> {
@@ -867,6 +966,152 @@ export async function saveLinkedInPublication(runId: string, articleSlug: string
   });
 }
 
+async function listSocialProjectIdsFromBlobs() {
+  const projectIds = new Set<string>();
+  let cursor: string | undefined;
+
+  do {
+    const page = await listBlobs({
+      prefix: "social/",
+      mode: "expanded",
+      cursor,
+      ...blobOptions()
+    });
+
+    for (const blob of page.blobs) {
+      const [, projectId] = blob.pathname.split("/");
+      if (projectId) {
+        projectIds.add(projectId);
+      }
+    }
+
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+
+  return Array.from(projectIds);
+}
+
+async function deleteSocialProjectBlobs(projectId: string) {
+  const paths: string[] = [];
+  let cursor: string | undefined;
+  const prefix = blobPath("social", projectId) + "/";
+
+  do {
+    const page = await listBlobs({
+      prefix,
+      mode: "expanded",
+      cursor,
+      ...blobOptions()
+    });
+
+    paths.push(...page.blobs.map((blob) => blob.pathname));
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+
+  if (paths.length) {
+    await deleteBlob(paths, blobOptions());
+  }
+}
+
+export function createSocialProjectId(topic?: string) {
+  const slug = (topic || "social").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return `${new Date().toISOString().slice(0, 10)}_${slug || "social"}_${randomUUID().slice(0, 8)}`;
+}
+
+export async function saveSocialProject(project: SocialProject) {
+  const record: SocialProject = socialProjectSchema.parse(project);
+  await writeSocialJson(record.projectId, "project.json", record);
+  return record;
+}
+
+export async function loadSocialProject(projectId: string) {
+  const record = await readSocialJson<SocialProject>(projectId, "project.json");
+  return record ? socialProjectSchema.parse(record) : null;
+}
+
+export async function saveSocialOAuthState(state: SocialOAuthState) {
+  const current = (await readSocialRootJson<{ states: SocialOAuthState[] }>("oauth-states.json")) ?? { states: [] };
+  const record = {
+    states: [
+      ...current.states.filter((entry) => entry.state !== state.state),
+      socialOAuthStateSchema.parse(state)
+    ]
+  };
+
+  await writeSocialRootJson("oauth-states.json", record);
+  return record;
+}
+
+export async function loadSocialOAuthState(state: string) {
+  const current = await readSocialRootJson<{ states: SocialOAuthState[] }>("oauth-states.json");
+  if (!current) {
+    return null;
+  }
+
+  const match = current.states.find((entry) => entry.state === state);
+  if (!match) {
+    return null;
+  }
+
+  if (new Date(match.expiresAt).getTime() < Date.now()) {
+    await deleteSocialOAuthState(state);
+    return null;
+  }
+
+  return socialOAuthStateSchema.parse(match);
+}
+
+export async function deleteSocialOAuthState(state: string) {
+  const current = await readSocialRootJson<{ states: SocialOAuthState[] }>("oauth-states.json");
+  if (!current) {
+    return;
+  }
+
+  const record = {
+    states: current.states.filter((entry) => entry.state !== state)
+  };
+
+  await writeSocialRootJson("oauth-states.json", record);
+}
+
+export async function deleteSocialProject(projectId: string) {
+  if (USE_BLOB_STORAGE) {
+    await deleteSocialProjectBlobs(projectId);
+  } else {
+    await rm(path.join(SOCIAL_ROOT, projectId), { recursive: true, force: true });
+  }
+  return true;
+}
+
+export async function listSocialProjectSummaries(): Promise<SocialProjectSummary[]> {
+  const projectIds = USE_BLOB_STORAGE ? await listSocialProjectIdsFromBlobs() : await listSocialProjectIds();
+  const projects = await Promise.all(projectIds.map((projectId) => loadSocialProject(projectId)));
+
+  return projects
+    .filter((project): project is SocialProject => Boolean(project))
+    .map((project) => {
+      const platformCount = project.platforms.length;
+      const readyCount = project.platforms.filter(
+        (platform) => platform.variants.some((variant) => variant.callToAction && variant.body.trim().length > 0)
+      ).length;
+      const scheduledCount = project.platforms.filter((platform) => Boolean(platform.schedule)).length;
+      return {
+        projectId: project.projectId,
+        title: project.title,
+        updatedAt: project.updatedAt,
+        sourceLabel:
+          project.source.mode === "url"
+            ? project.source.url || project.source.topic
+            : project.source.topic || "Manual topic",
+        sourceMode: project.source.mode,
+        platformCount,
+        readyCount,
+        scheduledCount
+      };
+    })
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
 export async function updateManifest(
   runId: string,
   patch: Partial<Omit<RunManifest, "runId" | "schemaVersion" | "createdAt" | "steps">> & {
@@ -1016,6 +1261,15 @@ export async function listRunSummaries(): Promise<RunSummary[]> {
     })
     .filter((run) => Boolean(run.runId))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+async function listSocialProjectIds() {
+  try {
+    const entries = await readdir(SOCIAL_ROOT, { withFileTypes: true });
+    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  } catch {
+    return [];
+  }
 }
 
 export async function listRuns() {

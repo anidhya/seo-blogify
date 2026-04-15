@@ -61,6 +61,7 @@ type RequestBody = {
   comments?: string;
   approved?: boolean;
   markdown?: string;
+  analysis?: BrandAnalysis;
   payload?: WorkflowInput & {
     analysis?: BrandAnalysis;
     selectedTopic?: TopicSuggestion;
@@ -808,6 +809,17 @@ export async function POST(request: Request) {
         wordCount: blog.markdown.split(/\s+/).filter(Boolean).length,
         quality: qualityStatus.quality
       });
+    }
+
+    if (step === "update-analysis") {
+      const runId = body.runId;
+      const analysis = body.analysis as BrandAnalysis | undefined;
+      if (!runId || !analysis) {
+        return NextResponse.json({ error: "runId and analysis are required." }, { status: 400 });
+      }
+      await saveAnalysis(runId, analysis);
+      await updateManifest(runId, { status: "analyzed" });
+      return NextResponse.json({ runId, ok: true });
     }
 
     if (step === "update-blog") {

@@ -6,23 +6,42 @@ import type { RunSummary } from "@/lib/types";
 import WorkspaceShell from "../components/workspace-shell";
 
 async function fetchProfileSummaries() {
-  const response = await fetch("/api/runs", { cache: "no-store" });
-  const data = (await response.json()) as { profiles?: RunSummary[] };
+  const res = await fetch("/api/runs", { cache: "no-store" });
+  const data = (await res.json()) as { profiles?: RunSummary[] };
   return data.profiles ?? [];
 }
 
-function ProfileSkeleton() {
+function getDomain(url: string) {
+  try { return new URL(url).hostname.replace(/^www\./, ""); }
+  catch { return url || "Unknown"; }
+}
+
+function timeAgo(dateStr?: string) {
+  if (!dateStr) return "—";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function StatusBadge({ status }: { status?: string | null }) {
+  if (status === "publish_ready") return (
+    <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+      Ready
+    </span>
+  );
+  if (status === "needs_review") return (
+    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+      Review
+    </span>
+  );
   return (
-    <article className="rounded-[12px] border border-black/10 bg-white/94 p-4 shadow-[0_6px_14px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-white/5">
-      <div className="animate-pulse space-y-3" aria-hidden="true">
-        <div className="h-5 w-1/3 rounded-full bg-black/5 dark:bg-white/10" />
-        <div className="h-4 w-1/2 rounded-full bg-black/5 dark:bg-white/10" />
-        <div className="grid gap-2">
-          <div className="h-4 w-full rounded-full bg-black/5 dark:bg-white/10" />
-          <div className="h-4 w-5/6 rounded-full bg-black/5 dark:bg-white/10" />
-        </div>
-      </div>
-    </article>
+    <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold text-zinc-500 dark:bg-white/8 dark:text-zinc-400">
+      Draft
+    </span>
   );
 }
 
@@ -30,212 +49,226 @@ export default function ProfilesPage() {
   const [profiles, setProfiles] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-
-    async function loadProfiles() {
-      try {
-        setError(null);
-        const result = await fetchProfileSummaries();
-        if (active) {
-          setProfiles(result);
-        }
-      } catch {
-        if (active) {
-          setProfiles([]);
-          setError("Unable to load synced profiles.");
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadProfiles();
-
-    return () => {
-      active = false;
-    };
+    fetchProfileSummaries()
+      .then((r) => { if (active) setProfiles(r); })
+      .catch(() => { if (active) setError("Unable to load profiles."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
 
-  async function refreshProfiles() {
+  async function deleteProfile(runId: string, name: string) {
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
     try {
+      setDeletingId(runId);
+      const res = await fetch(`/api/runs/${runId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed.");
       setProfiles(await fetchProfileSummaries());
-    } catch {
-      setProfiles([]);
-    }
-  }
-
-  async function deleteProfile(runId: string, companyName: string) {
-    const confirmed = window.confirm(
-      `Delete "${companyName}" and all saved workflow data permanently? This cannot be undone.`
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      setError(null);
-      setDeletingRunId(runId);
-      const response = await fetch(`/api/runs/${runId}`, { method: "DELETE" });
-      if (!response.ok) {
-        const data = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(data?.error ?? "Failed to delete synced profile.");
-      }
-
-      await refreshProfiles();
-    } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Unknown error");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed.");
     } finally {
-      setDeletingRunId(null);
+      setDeletingId(null);
     }
   }
 
-  const totalProfiles = profiles.length;
-  const publishReadyProfiles = profiles.filter((profile) => profile.publishStatus === "publish_ready").length;
+  // Group profiles by domain
+  const groups: Record<string, RunSummary[]> = {};
+  for (const p of profiles) {
+    const domain = getDomain(p.websiteUrl);
+    if (!groups[domain]) groups[domain] = [];
+    groups[domain].push(p);
+  }
+  const sortedDomains = Object.keys(groups).sort();
+
+  const totalReady = profiles.filter((p) => p.publishStatus === "publish_ready").length;
 
   return (
     <WorkspaceShell
-      title="Marketier AI 0.1"
-      subtitle="All synced brands and workspace profiles."
-      backHref="/"
-      backLabel="Home"
-      breadcrumbs={[
-        { label: "Sync", href: "/" },
-        { label: "Profiles", active: true }
-      ]}
-      topAction={null}
+      title="Dashboard"
       navItems={[
-        { label: "Sync", href: "/", icon: "sync" },
-        { label: "Profiles", href: "/profiles", icon: "articles", active: true },
+        { label: "New project", href: "/", icon: "sync" },
+        { label: "Dashboard", href: "/profiles", icon: "articles", active: true },
         { label: "FAQ", href: "/faq", icon: "publish" }
       ]}
     >
-      <section className="grid gap-4">
-        <div className="surface-shell grid gap-4 p-4 lg:p-5">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">Synced profiles</p>
-              <h1 className="mt-1 font-display text-3xl tracking-[-0.04em] text-zinc-900 dark:text-zinc-50">Manage saved brands</h1>
-              <p className="mt-1 max-w-2xl text-sm text-zinc-600 dark:text-zinc-300">
-                Open a workspace, preview the output, or delete a profile permanently.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <span className="rounded-full bg-black/5 px-3 py-1 text-xs font-semibold text-zinc-700 dark:bg-white/5 dark:text-zinc-300">
-                {loading ? "Loading…" : `${totalProfiles} total`}
-              </span>
-              <span className="rounded-full bg-[#0f7b49]/10 px-3 py-1 text-xs font-semibold text-[#0f7b49] dark:text-[#86efac]">
-                {loading ? "Loading…" : `${publishReadyProfiles} publish-ready`}
-              </span>
-            </div>
-          </div>
+      <div className="px-6 py-6">
 
-          {error ? (
-            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">
-              {error}
-            </div>
-          ) : null}
+        {/* Header */}
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">Dashboard</h1>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">All your brand projects, grouped by website.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {!loading && (
+              <>
+                <div className="rounded-xl border border-black/8 bg-white px-4 py-2 text-center dark:border-white/10 dark:bg-white/5">
+                  <p className="text-lg font-bold text-zinc-900 dark:text-white">{profiles.length}</p>
+                  <p className="text-xs text-zinc-400">Total runs</p>
+                </div>
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-center dark:border-emerald-900/40 dark:bg-emerald-900/20">
+                  <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{totalReady}</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-500">Ready</p>
+                </div>
+              </>
+            )}
+            <Link
+              href="/"
+              className="flex items-center gap-2 rounded-xl bg-[#0f172a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1e293b]"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+              </svg>
+              New project
+            </Link>
+          </div>
         </div>
 
-        {loading ? (
-          <div className="grid gap-3">
-            <ProfileSkeleton />
-            <ProfileSkeleton />
-            <ProfileSkeleton />
+        {error && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-400">
+            {error}
           </div>
-        ) : profiles.length === 0 ? (
-          <div className="surface-shell p-6 text-sm text-zinc-600 dark:text-zinc-300">No synced profiles yet.</div>
-        ) : (
-          <div className="grid gap-3">
-            {profiles.map((profile) => (
-              <article
-                key={profile.runId}
-                className="rounded-[12px] border border-black/10 bg-white/92 p-4 shadow-[0_6px_14px_rgba(15,23,42,0.03)] transition hover:-translate-y-0.5 hover:border-[#0f7b49]/20 hover:shadow-[0_12px_24px_rgba(15,123,73,0.06)] dark:border-white/10 dark:bg-white/5"
-              >
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-[linear-gradient(135deg,#0f7b49,#111827)] text-sm font-semibold text-white shadow-[0_10px_22px_rgba(15,123,73,0.18)]">
-                        {profile.companyName.slice(0, 1).toUpperCase()}
-                      </div>
+        )}
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Link
-                            className="truncate text-base font-semibold text-zinc-900 transition hover:text-[#0f7b49] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:text-zinc-50"
-                            href={`/runs/${profile.runId}`}
-                          >
-                            {profile.companyName}
-                          </Link>
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${
-                              profile.publishStatus === "publish_ready"
-                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                                : profile.publishStatus === "needs_review"
-                                  ? "bg-black/5 text-zinc-600 dark:bg-white/10 dark:text-zinc-300"
-                                  : "bg-[#0f7b49]/10 text-[#0f7b49] dark:text-[#86efac]"
-                            }`}
-                          >
-                            {profile.publishStatus ?? profile.status}
-                          </span>
-                        </div>
-                        <p className="mt-1 break-words text-xs text-zinc-500 dark:text-zinc-400">{profile.websiteUrl}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-2 text-[11px] text-zinc-500 dark:text-zinc-400 xl:min-w-[360px] xl:max-w-[420px]">
-                    <div className="flex flex-wrap gap-2">
-                      <span>Updated {profile.updatedAt ? new Date(profile.updatedAt).toLocaleString() : "n/a"}</span>
-                      <span>Quality {profile.qualityScore ?? "n/a"}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {profile.blogTitle ? <span className="truncate">{profile.blogTitle}</span> : null}
-                      {profile.progressPercent !== null ? (
-                        <span>
-                          {profile.progressPercent}%{profile.progressLabel ? ` • ${profile.progressLabel}` : ""}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 xl:justify-end">
-                    <Link
-                      className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-zinc-900 transition hover:-translate-y-0.5 hover:border-[#0f7b49]/25 hover:text-[#0f7b49] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10"
-                      href={`/runs/${profile.runId}`}
-                    >
-                      Open workspace
-                    </Link>
-                    {profile.hasBlog && profile.blogSlug ? (
-                      <Link
-                        className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-zinc-900 transition hover:-translate-y-0.5 hover:border-[#0f7b49]/25 hover:text-[#0f7b49] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10"
-                        href={`/runs/${profile.runId}/blog/${profile.blogSlug}`}
-                        target="_blank"
-                      >
-                        Open preview
-                      </Link>
-                    ) : null}
-                    <button
-                      className="inline-flex items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:-translate-y-0.5 hover:bg-rose-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/25 disabled:cursor-progress disabled:opacity-60 dark:text-rose-200"
-                      type="button"
-                      onClick={() => deleteProfile(profile.runId, profile.companyName)}
-                      disabled={deletingRunId === profile.runId}
-                      aria-label={`Delete ${profile.companyName}`}
-                    >
-                      {deletingRunId === profile.runId ? "Deleting…" : "Delete"}
-                    </button>
-                  </div>
+        {/* Loading skeletons */}
+        {loading && (
+          <div className="grid gap-6">
+            {[1, 2].map((i) => (
+              <div key={i} className="animate-pulse">
+                <div className="mb-3 h-4 w-36 rounded-full bg-black/6 dark:bg-white/8" />
+                <div className="grid gap-2">
+                  {[1, 2].map((j) => (
+                    <div key={j} className="h-16 rounded-xl bg-black/4 dark:bg-white/5" />
+                  ))}
                 </div>
-              </article>
+              </div>
             ))}
           </div>
         )}
-      </section>
+
+        {/* Empty state */}
+        {!loading && profiles.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-black/8 bg-white dark:border-white/10 dark:bg-white/5">
+              <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7 text-zinc-300 dark:text-zinc-600">
+                <path d="M7 4h10l3 3v13H7z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                <path d="M14 4v4h4M9 11h6M9 15h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <p className="text-base font-semibold text-zinc-700 dark:text-zinc-300">No projects yet</p>
+            <p className="mt-1 text-sm text-zinc-400">Create your first project to get started.</p>
+            <Link
+              href="/"
+              className="mt-4 rounded-xl bg-[#0f172a] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1e293b]"
+            >
+              Create a project
+            </Link>
+          </div>
+        )}
+
+        {/* Grouped profiles */}
+        {!loading && sortedDomains.length > 0 && (
+          <div className="grid gap-8">
+            {sortedDomains.map((domain) => {
+              const runs = groups[domain];
+              const domainReady = runs.filter((r) => r.publishStatus === "publish_ready").length;
+              return (
+                <div key={domain}>
+                  {/* Domain header */}
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-200 text-xs font-bold text-zinc-500 dark:bg-white/10 dark:text-zinc-400">
+                      {domain.slice(0, 1).toUpperCase()}
+                    </div>
+                    <div className="flex flex-1 items-center gap-2">
+                      <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{domain}</h2>
+                      <span className="text-xs text-zinc-400">{runs.length} run{runs.length !== 1 ? "s" : ""}</span>
+                      {domainReady > 0 && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                          {domainReady} ready
+                        </span>
+                      )}
+                    </div>
+                    <div className="h-px flex-1 bg-black/6 dark:bg-white/8" />
+                  </div>
+
+                  {/* Run cards */}
+                  <div className="grid gap-2">
+                    {runs.map((profile) => (
+                      <article
+                        key={profile.runId}
+                        className="group flex items-center gap-4 rounded-xl border border-black/8 bg-white p-4 transition hover:border-[#0f7b49]/25 hover:shadow-sm dark:border-white/8 dark:bg-white/4 dark:hover:border-[#0f7b49]/25"
+                      >
+                        {/* Avatar */}
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#0f7b49,#111827)] text-sm font-bold text-white">
+                          {(profile.companyName || domain).slice(0, 1).toUpperCase()}
+                        </div>
+
+                        {/* Info */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                              href={`/runs/${profile.runId}`}
+                              className="text-sm font-semibold text-zinc-900 transition hover:text-[#0f7b49] dark:text-zinc-100 dark:hover:text-[#4ade80]"
+                            >
+                              {profile.companyName || "Untitled brand"}
+                            </Link>
+                            <StatusBadge status={profile.publishStatus} />
+                          </div>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+                            <span>{timeAgo(profile.updatedAt)}</span>
+                            {profile.qualityScore != null && (
+                              <>
+                                <span className="text-zinc-200 dark:text-zinc-700">·</span>
+                                <span>Quality {profile.qualityScore}%</span>
+                              </>
+                            )}
+                            {profile.blogTitle && (
+                              <>
+                                <span className="text-zinc-200 dark:text-zinc-700">·</span>
+                                <span className="max-w-[200px] truncate">{profile.blogTitle}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex shrink-0 items-center gap-2 opacity-0 transition group-hover:opacity-100">
+                          <Link
+                            href={`/runs/${profile.runId}`}
+                            className="rounded-lg border border-black/8 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-[#0f7b49]/30 hover:text-[#0f7b49] dark:border-white/10 dark:bg-white/5 dark:text-zinc-300"
+                          >
+                            Open
+                          </Link>
+                          {profile.hasBlog && profile.blogSlug && (
+                            <Link
+                              href={`/runs/${profile.runId}/blog/${profile.blogSlug}`}
+                              target="_blank"
+                              className="rounded-lg border border-black/8 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-[#0f7b49]/30 hover:text-[#0f7b49] dark:border-white/10 dark:bg-white/5 dark:text-zinc-300"
+                            >
+                              Preview
+                            </Link>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => deleteProfile(profile.runId, profile.companyName || domain)}
+                            disabled={deletingId === profile.runId}
+                            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-900/20"
+                          >
+                            {deletingId === profile.runId ? "…" : "Delete"}
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </WorkspaceShell>
   );
 }
