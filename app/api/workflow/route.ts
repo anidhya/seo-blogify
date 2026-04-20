@@ -9,6 +9,7 @@ import {
   generateTopicSuggestions,
   rewriteBlogDraft
 } from "@/lib/openai";
+import { buildDataForSeoTopicEvidence, reviewTopicCandidatesAgainstSerp } from "@/lib/dataforseo";
 import { generateLinkedInCarouselImages } from "@/lib/google-ai";
 import {
   deriveExistingTopics,
@@ -16,6 +17,7 @@ import {
   formatExistingTopicsForPrompt,
   formatRejectedTopicsForPrompt,
   mergeExistingTopics,
+  normalizeTopicSuggestions,
   validateTopicCandidates
 } from "@/lib/topic-dedup";
 import type {
@@ -45,6 +47,7 @@ import {
   saveBlogRevision,
   saveRegenerationNote,
   saveQuality,
+  saveTopicResearch,
   saveTopicCandidates,
   saveTopicValidation,
   saveResearch,
@@ -428,8 +431,9 @@ function formatBlogStructurePrompt(params: {
   blogText: string;
   sitemapUrls: string[];
   internalLinkHints: string;
+  topicResearch?: string | null;
 }) {
-  return [
+  const sections = [
     "Write a clean, structured, editorial blog post with no bloat or spam.",
     "Follow this structure: hook, answer-first intro, short orientation section like 'In this article', 3 to 6 strong H2 sections, concise takeaway block, FAQ, SEO meta, image prompts, and internal links.",
     "Keep paragraphs short and concrete.",
@@ -448,14 +452,14 @@ function formatBlogStructurePrompt(params: {
     "",
     `Existing site content and link targets:\n${params.internalLinkHints}`,
     "",
-    formatResearchBlock(
-      params.input,
-      params.homepageText,
-      params.blogText,
-      params.sitemapUrls,
-      null
-    )
-  ].join("\n");
+    formatResearchBlock(params.input, params.homepageText, params.blogText, params.sitemapUrls, null)
+  ];
+
+  if (params.topicResearch) {
+    sections.push("", `Topic research evidence:\n${params.topicResearch}`);
+  }
+
+  return sections.join("\n");
 }
 
 function formatRewritePrompt(params: {
@@ -544,7 +548,11 @@ async function scoreAndPersistBlog(params: {
   return { quality: qualityPayload, publishStatus: quality.score >= 80 ? "publish_ready" : "needs_review" };
 }
 
-async function generateValidatedTopicSet(run: Awaited<ReturnType<typeof loadRun>>, targetCount = 10) {
+async function generateValidatedTopicSet(
+  runId: string,
+  run: Awaited<ReturnType<typeof loadRun>>,
+  targetCount = 10
+) {
   if (!run.input || !run.research || !run.analysis) {
     throw new Error("Saved run data is incomplete.");
   }
@@ -572,6 +580,7 @@ async function generateValidatedTopicSet(run: Awaited<ReturnType<typeof loadRun>
         `Blog ${index + 1}\nURL: ${blog.url}\nTitle: ${blog.title}\nExcerpt: ${blog.excerpt}\nContent:\n${blog.content}`
     )
     .join("\n\n");
+  const dataForSeoEvidence = await buildDataForSeoTopicEvidence(run.input, run.analysis.analysis);
 
   for (let round = 0; round < 3 && acceptedTopics.length < targetCount; round += 1) {
     const missing = targetCount - acceptedTopics.length;
@@ -582,6 +591,7 @@ async function generateValidatedTopicSet(run: Awaited<ReturnType<typeof loadRun>
       "Do not rewrite existing articles with only new wording.",
       "Each topic must target a distinct intent, keyword cluster, or content angle.",
       "Avoid topics that are semantically similar to any existing article or any previously accepted topic in this run.",
+      "If a topic is already covered by live SERP results or existing site content, rewrite it into a meaningfully different angle instead of paraphrasing.",
       "Treat sitemap URLs as existing content coverage even when no page snapshot is available.",
       "Return only new topics.",
       "",
@@ -599,19 +609,30 @@ async function generateValidatedTopicSet(run: Awaited<ReturnType<typeof loadRun>
         run.research.resolvedSitemapUrl ?? null
       )
     ];
+    if (dataForSeoEvidence) {
+      promptParts.push("", dataForSeoEvidence);
+    }
 
     if (rejectedTopics.length > 0) {
       promptParts.push("", `Rejected topics to avoid:\n${formatRejectedTopicsForPrompt(rejectedTopics)}`);
     }
 
-    const proposedTopics = await generateTopicSuggestions(promptParts.join("\n"), missing);
-    candidateTopics.push(...proposedTopics);
+    const proposedTopics = await generateTopicSuggestions(promptParts.join("\n"), missing, {
+      webSearch: !dataForSeoEvidence
+    });
+    const normalizedProposedTopics = normalizeTopicSuggestions(proposedTopics);
+    candidateTopics.push(...normalizedProposedTopics);
 
-    const validation = validateTopicCandidates(coveragePool, proposedTopics);
-    acceptedTopics.push(...validation.accepted);
-    rejectedTopics.push(...validation.rejected);
+    const validation = validateTopicCandidates(coveragePool, normalizedProposedTopics);
+    const serpValidation = await reviewTopicCandidatesAgainstSerp({
+      siteDomain: new URL(run.input.websiteUrl).hostname,
+      existingTopics: coveragePool,
+      candidates: validation.accepted
+    });
+    acceptedTopics.push(...serpValidation.accepted);
+    rejectedTopics.push(...validation.rejected, ...serpValidation.rejected);
     coveragePool.push(
-      ...validation.accepted.map((topic) => ({
+      ...serpValidation.accepted.map((topic) => ({
         sourceUrl: `generated:${topic.primaryKeyword}`,
         sourceTitle: topic.title,
         title: topic.title,
@@ -628,7 +649,13 @@ async function generateValidatedTopicSet(run: Awaited<ReturnType<typeof loadRun>
     throw new Error(`Could not generate ${targetCount} unique topics without overlap.`);
   }
 
-  return { existingTopics, candidateTopics, finalAccepted, finalRejected: rejectedTopics };
+  return {
+    existingTopics,
+    candidateTopics,
+    finalAccepted,
+    finalRejected: rejectedTopics,
+    dataForSeoEvidence
+  };
 }
 
 export async function POST(request: Request) {
@@ -698,7 +725,7 @@ export async function POST(request: Request) {
       }
 
       await setProgress(runId, "suggest-topics", 10, "Preparing topic discovery prompts");
-      const topicSet = await generateValidatedTopicSet(run, 10);
+      const topicSet = await generateValidatedTopicSet(runId, run, 10);
       await setProgress(runId, "suggest-topics", 55, "Validating topic overlap");
       const topicsRecord = await saveTopics(runId, topicSet.finalAccepted);
       await saveTopicCandidates(runId, topicSet.candidateTopics);
@@ -708,6 +735,9 @@ export async function POST(request: Request) {
         accepted: topicSet.finalAccepted,
         rejected: topicSet.finalRejected
       });
+      if (topicSet.dataForSeoEvidence) {
+        await saveTopicResearch(runId, topicSet.dataForSeoEvidence);
+      }
       await updateManifest(runId, { status: "topics", steps: { topics: true } });
       await setProgress(runId, "suggest-topics", 100, "Topics ready", true);
       return NextResponse.json({ runId, topics: topicsRecord.topics });
@@ -757,7 +787,8 @@ export async function POST(request: Request) {
         homepageText,
         blogText,
         sitemapUrls: run.research.sitemapUrls ?? [],
-        internalLinkHints: formatInternalLinkHints(run)
+        internalLinkHints: formatInternalLinkHints(run),
+        topicResearch: run.topicResearch?.evidence ?? null
       });
 
       await setProgress(runId, "generate-blog", 35, "Drafting article and SEO assets");

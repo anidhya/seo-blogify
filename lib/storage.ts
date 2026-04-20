@@ -23,6 +23,7 @@ import {
   manifestSchema,
   pageSnapshotSchema,
   researchSchema,
+  topicResearchSchema,
   topicSuggestionSchema,
   topicValidationSchema,
   regenerationNoteSchema,
@@ -156,6 +157,15 @@ export type RunTopicValidationRecord = {
   validation: TopicValidation;
 };
 
+export type RunTopicResearchRecord = {
+  runId: string;
+  schemaVersion: typeof SCHEMA_VERSION;
+  createdAt: string;
+  updatedAt: string;
+  source: "dataforseo";
+  evidence: string;
+};
+
 export type RunApprovedTopicRecord = {
   runId: string;
   schemaVersion: typeof SCHEMA_VERSION;
@@ -224,6 +234,7 @@ export type RunBundle = {
   topicCandidates: RunTopicCandidatesRecord | null;
   topics: RunTopicsRecord | null;
   topicValidation: RunTopicValidationRecord | null;
+  topicResearch: RunTopicResearchRecord | null;
   approvedTopic: RunApprovedTopicRecord | null;
   blog: RunBlogRecord | null;
   quality: RunQualityRecord | null;
@@ -704,6 +715,24 @@ export async function saveTopicValidation(runId: string, validation: TopicValida
   return record;
 }
 
+export async function saveTopicResearch(runId: string, evidence: string) {
+  const timestamp = nowIso();
+  const record: RunTopicResearchRecord = {
+    runId,
+    schemaVersion: SCHEMA_VERSION,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    source: "dataforseo",
+    evidence: topicResearchSchema.parse({
+      source: "dataforseo",
+      evidence
+    }).evidence
+  };
+
+  await writeJson(runId, "topic-research.json", record);
+  return record;
+}
+
 export async function saveApprovedTopic(runId: string, approvedTopic: TopicSuggestion) {
   const timestamp = nowIso();
   const record: RunApprovedTopicRecord = {
@@ -1158,6 +1187,7 @@ export async function loadRun(runId: string): Promise<RunBundle> {
   const topicCandidates = await readJson<RunTopicCandidatesRecord>(runId, "topic-candidates.json");
   const topics = await readJson<RunTopicsRecord>(runId, "topics.json");
   const topicValidation = await readJson<RunTopicValidationRecord>(runId, "topic-validation.json");
+  const topicResearch = await readJson<RunTopicResearchRecord>(runId, "topic-research.json");
   const approvedTopic = await readJson<RunApprovedTopicRecord>(runId, "approved-topic.json");
   const blog = await readJson<RunBlogRecord>(runId, "blog.json");
   const quality = await readJson<RunQualityRecord>(runId, "quality.json");
@@ -1176,6 +1206,7 @@ export async function loadRun(runId: string): Promise<RunBundle> {
     topicCandidates,
     topics,
     topicValidation,
+    topicResearch,
     approvedTopic,
     blog,
     quality,

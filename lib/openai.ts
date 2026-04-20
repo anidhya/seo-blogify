@@ -210,10 +210,15 @@ export async function generateStructuredAnalysis(prompt: string) {
   return parsed;
 }
 
-export async function generateTopicSuggestions(prompt: string, count = 10) {
+export async function generateTopicSuggestions(
+  prompt: string,
+  count = 10,
+  options?: { webSearch?: boolean }
+) {
   const client = getClient();
-  const tools =
-    process.env.OPENAI_ENABLE_WEB_SEARCH === "false" ? [] : [{ type: "web_search_preview" as const }];
+  const shouldUseWebSearch =
+    options?.webSearch ?? process.env.OPENAI_ENABLE_WEB_SEARCH !== "false";
+  const tools = shouldUseWebSearch ? [{ type: "web_search_preview" as const }] : [];
 
   const response = await client.responses.parse({
     model: defaultModel,
@@ -223,7 +228,7 @@ export async function generateTopicSuggestions(prompt: string, count = 10) {
       {
         role: "developer",
         content:
-          "You are an SEO strategist. Suggest topics that can realistically rank, align to search intent, and fit the brand voice."
+          "You are an SEO strategist. Suggest topics that can realistically rank, align to search intent, and fit the brand voice. Use declarative headline-style titles, not questions. Avoid question marks and avoid titles that begin with question words like what, why, how, when, where, who, which, can, should, do, does, is, are, will, would, or could."
       },
       {
         role: "user",

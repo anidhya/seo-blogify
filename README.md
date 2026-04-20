@@ -76,6 +76,9 @@ Important variables:
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL` defaults to `gpt-5.4-mini`
 - `OPENAI_ENABLE_WEB_SEARCH` can be set to `false` to disable web search for topic generation
+- `DATAFORSEO_LOGIN` and `DATAFORSEO_PASSWORD` enable DataForSEO-backed keyword and SERP evidence for topic generation
+- `DATAFORSEO_LOCATION_CODE` defaults to `2840` for United States
+- `DATAFORSEO_LANGUAGE_CODE` defaults to `en`
 - `LINKEDIN_CLIENT_ID`
 - `LINKEDIN_CLIENT_SECRET`
 - `LINKEDIN_REDIRECT_URI`
@@ -106,6 +109,7 @@ Key files:
 - `topics.json`
 - `topic-candidates.json`
 - `topic-validation.json`
+- `topic-research.json`
 - `approved-topic.json`
 - `blog.json`
 - `blog.md`
@@ -129,5 +133,6 @@ Key files:
 - Social Studio supports direct OAuth connections and direct publish for Instagram and X when the provider credentials are configured.
 - The landing page, workspace, preview, and LinkedIn pages all share the same compact shell so the UI stays short and navigable.
 - Social Studio uses a separate `social/` project store so it can behave like its own product while still sharing the shell and design system.
+- A reusable DataForSEO research skill lives at `skills/dataforseo-seo-research/` for future topic and blog briefing workflows.
 - The storage layer writes to the local filesystem in development and to Vercel Blob on deploy when `BLOB_READ_WRITE_TOKEN` is set. If the Blob token is missing on Vercel, the app falls back to the instance filesystem and the data is still ephemeral.
 - CMS publishing is not wired yet. The output is generated as publication-ready markdown for the next handoff step.
