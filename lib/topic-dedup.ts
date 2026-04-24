@@ -47,6 +47,53 @@ function unique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
+function titleCase(value: string) {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function stripQuestionPrefix(title: string) {
+  return title
+    .trim()
+    .replace(/[?]+$/g, "")
+    .replace(/^(what|why|when|where|who|which|how|can|should|do|does|is|are|will|would|could)\s+(is|are|does|do|can|should|will|would|could)?\s*/i, "")
+    .replace(/^(how to|what is|why is|where to|when to|can you|should you)\s+/i, "")
+    .replace(/^to\s+/i, "")
+    .trim();
+}
+
+export function isQuestionStyleTopicTitle(title: string) {
+  const normalized = title.trim().toLowerCase();
+  return (
+    normalized.endsWith("?") ||
+    /^(what|why|when|where|who|which|how|can|should|do|does|is|are|will|would|could)\b/.test(normalized)
+  );
+}
+
+export function rewriteQuestionStyleTopicTitle(topic: TopicSuggestion) {
+  if (!isQuestionStyleTopicTitle(topic.title)) {
+    return topic;
+  }
+
+  const stripped = stripQuestionPrefix(topic.title);
+  const primary = topic.primaryKeyword.trim();
+  const base = stripped.length >= 8 ? stripped : primary;
+  const fallback = primary || stripped || "Topic";
+  const rewritten = `${titleCase(base || fallback)} Guide`.trim();
+
+  return {
+    ...topic,
+    title: rewritten
+  };
+}
+
+export function normalizeTopicSuggestions(topics: TopicSuggestion[]) {
+  return topics.map((topic) => rewriteQuestionStyleTopicTitle(topic));
+}
+
 function stem(value: string) {
   return value.replace(/(ing|ed|es|s)$/u, "");
 }

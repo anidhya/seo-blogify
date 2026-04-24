@@ -74,6 +74,11 @@ export const topicValidationSchema = z.object({
   rejected: z.array(topicValidationRejectedSchema)
 });
 
+export const topicResearchSchema = z.object({
+  source: z.literal("dataforseo"),
+  evidence: z.string()
+});
+
 export const blogQualitySchema = z.object({
   score: z.number(),
   publishStatus: z.enum(["publish_ready", "needs_review"]),

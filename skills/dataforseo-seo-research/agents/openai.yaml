@@ -1,0 +1,7 @@
+interface:
+  display_name: "DataForSEO SEO Research"
+  short_description: "SEO topics and briefs from DataForSEO"
+  default_prompt: "Use $dataforseo-seo-research to turn DataForSEO keyword and SERP signals into topic ideas or blog briefs for Marketier AI."
+
+policy:
+  allow_implicit_invocation: true
