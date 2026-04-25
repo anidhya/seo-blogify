@@ -1,0 +1,7 @@
+interface:
+  display_name: "SEO Friendly Topics"
+  short_description: "Topic queues from brand analysis and coverage"
+  default_prompt: "Use $seo-friendly-topics to generate or validate a distinct Marketier AI topic queue from brand analysis, research, and existing coverage."
+
+policy:
+  allow_implicit_invocation: true
