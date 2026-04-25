@@ -8,7 +8,7 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 - Language: TypeScript
 - Styling: Tailwind CSS
 - UI system: shared workspace shell, compact rail navigation, light/dark theme
-- Core domains: brand analysis, topic generation, blog drafting, quality checks, LinkedIn publishing
+- Core domains: brand analysis, topic generation, blog drafting, quality checks, LinkedIn publishing, and Social Studio
 - Source of truth for visual decisions: `design.md`
 
 ## Common Commands
@@ -23,6 +23,9 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 ## Where Things Live
 
 - App routes and screens: `app/`
+- Social Studio and APIs: `app/social/`, `app/api/social/`
+- Profile and FAQ screens: `app/profiles/`, `app/faq/`
+- Run workspace and article views: `app/runs/[runId]/`, `app/runs/[runId]/articles/`, `app/runs/[runId]/blog/[slug]/`, `app/runs/[runId]/blog/[slug]/linkedin/`
 - Shared UI components: `app/components/`
 - Route-specific components: near the route they support
 - Business logic and utilities: `lib/`
@@ -46,6 +49,8 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 - Put route-specific logic in the route folder when that keeps the feature easier to follow.
 - Keep validation and schema changes aligned between `lib/schemas.ts`, route handlers, and UI consumers.
 - Treat storage changes carefully: local filesystem in development, Vercel Blob when configured for deployment.
+- Run workflow artifacts live under `data/runs/<runId>/` locally and `runs/<runId>/...` when Blob storage is enabled.
+- Social Studio persists project data under `data/social/<projectId>/` locally and `social/<projectId>/...` when Blob storage is enabled.
 
 ## UI Preferences
 
