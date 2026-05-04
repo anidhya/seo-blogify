@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { copyTextToClipboard } from "@/lib/clipboard";
 
 type Props = {
   text: string;
@@ -35,10 +36,11 @@ export default function CopyButton({ text, label, ariaLabel }: Props) {
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(text);
+      await copyTextToClipboard(text);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1400);
-    } catch {
+    } catch (error) {
+      console.warn("Copy button failed:", error);
       setCopied(false);
     }
   }

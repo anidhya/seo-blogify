@@ -349,6 +349,10 @@ export async function reviewTopicCandidatesAgainstSerp(params: {
   existingTopics: ExistingTopic[];
   candidates: TopicSuggestion[];
 }) {
+  if (!hasCredentials()) {
+    return { accepted: params.candidates, rejected: [] };
+  }
+
   const accepted: TopicSuggestion[] = [];
   const rejected: TopicValidationRejected[] = [];
 
