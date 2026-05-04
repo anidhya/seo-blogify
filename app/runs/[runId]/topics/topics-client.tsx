@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 import useWorkflowProgress from "@/lib/use-workflow-progress";
 import type { RunBundle } from "@/lib/storage";
 import type { BlogQuality, GeneratedBlog, TopicSuggestion } from "@/lib/types";
@@ -44,6 +44,8 @@ export default function TopicsClient({ runId, run }: Props) {
   const [topics, setTopics] = useState(run.topics?.topics ?? []);
   const [status, setStatus] = useState<string>(topics.length ? "Topics ready for approval." : "Generate a fresh queue.");
   const [error, setError] = useState<string | null>(null);
+  const [manualTopic, setManualTopic] = useState("");
+  const [manualTopicError, setManualTopicError] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<"suggest-topics" | "generate-blog" | null>(null);
   const [isPending, startTransition] = useTransition();
   const workflowProgress = useWorkflowProgress({ runId, enabled: Boolean(activeAction) });
@@ -62,18 +64,6 @@ export default function TopicsClient({ runId, run }: Props) {
           }
         : null;
 
-  useEffect(() => {
-    if (!activeAction || !workflowProgress?.isComplete) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setActiveAction(null);
-    }, 900);
-
-    return () => clearTimeout(timer);
-  }, [activeAction, workflowProgress?.isComplete]);
-
   function suggestTopics() {
     startTransition(async () => {
       try {
@@ -89,6 +79,8 @@ export default function TopicsClient({ runId, run }: Props) {
         const message = caughtError instanceof Error ? caughtError.message : "Unknown error";
         setError(message);
         setStatus("Topic generation failed.");
+      } finally {
+        setActiveAction(null);
       }
     });
   }
@@ -119,6 +111,41 @@ export default function TopicsClient({ runId, run }: Props) {
         const message = caughtError instanceof Error ? caughtError.message : "Unknown error";
         setError(message);
         setStatus("Blog generation failed.");
+      } finally {
+        setActiveAction(null);
+      }
+    });
+  }
+
+  function generateFromManualTopic(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const topicValue = manualTopic.trim();
+
+    if (!topicValue) {
+      setManualTopicError("Enter a topic before generating an article.");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        setError(null);
+        setManualTopicError(null);
+        setActiveAction("generate-blog");
+        setStatus(`Generating an article from “${topicValue}”…`);
+
+        const data = await postWorkflow("generate-blog", runId, {
+          manualTopic: topicValue
+        });
+
+        if ("blog" in data) {
+          setStatus(`Blog draft generated from “${topicValue}”.`);
+        }
+      } catch (caughtError) {
+        const message = caughtError instanceof Error ? caughtError.message : "Unknown error";
+        setError(message);
+        setStatus("Blog generation failed.");
+      } finally {
+        setActiveAction(null);
       }
     });
   }
@@ -132,6 +159,47 @@ export default function TopicsClient({ runId, run }: Props) {
           variant="top"
         />
       ) : null}
+
+      <form className="surface-shell grid gap-4 p-4" onSubmit={generateFromManualTopic}>
+        <div className="flex items-start justify-between gap-4 max-md:flex-col">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">Manual topic</p>
+            <h2 className="mt-1 font-display text-2xl tracking-[-0.04em] text-zinc-900 dark:text-zinc-50">Generate an article from your own topic</h2>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+              Type a topic, then run the same blog-generation pipeline used for approved suggestions.
+            </p>
+          </div>
+          <button
+            type="submit"
+            className="inline-flex shrink-0 items-center justify-center self-start whitespace-nowrap rounded-xl bg-[#0f172a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1e293b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isPending || Boolean(activeAction) || !manualTopic.trim()}
+          >
+            {activeAction === "generate-blog" ? "Generating…" : "Generate article"}
+          </button>
+        </div>
+        <div className="grid gap-2">
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">Topic</span>
+            <input
+              value={manualTopic}
+              onChange={(event) => {
+                setManualTopic(event.target.value);
+                if (manualTopicError) {
+                  setManualTopicError(null);
+                }
+              }}
+              placeholder="Example: content operations for lean marketing teams"
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+              disabled={isPending || Boolean(activeAction)}
+              className="rounded-xl border border-black/[0.08] bg-white/5 px-4 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#0f7b49]/35 focus:bg-white/5 focus:ring-2 focus:ring-[#0f7b49]/10 dark:border-white/[0.08] dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:bg-white/5"
+            />
+          </label>
+          {manualTopicError ? <p className="text-sm text-red-600 dark:text-red-400">{manualTopicError}</p> : null}
+        </div>
+      </form>
 
       <div className="surface-shell p-4">
         <div className="flex items-start justify-between gap-4 max-md:flex-col">
@@ -148,14 +216,14 @@ export default function TopicsClient({ runId, run }: Props) {
             >
               Open approved articles
             </Link>
-            <button
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/80 text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/20 disabled:cursor-progress disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200"
-              type="button"
-              onClick={suggestTopics}
-              disabled={isPending || activeAction === "suggest-topics"}
-              aria-label={topics.length ? "Refresh topics" : "Suggest 10 topics"}
-              title={topics.length ? "Refresh topics" : "Suggest 10 topics"}
-            >
+              <button
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/80 text-neutral-800 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/20 disabled:cursor-progress disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200"
+                type="button"
+                onClick={suggestTopics}
+                disabled={isPending || Boolean(activeAction)}
+                aria-label={topics.length ? "Refresh topics" : "Suggest 10 topics"}
+                title={topics.length ? "Refresh topics" : "Suggest 10 topics"}
+              >
               {activeAction === "suggest-topics" ? (
                 <svg aria-hidden="true" className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
@@ -206,7 +274,7 @@ export default function TopicsClient({ runId, run }: Props) {
                 <button
                   className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 text-[#0f7b49] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/20 disabled:cursor-progress disabled:opacity-60 dark:text-[#86efac]"
                   type="button"
-                  disabled={isPending || activeAction === "generate-blog"}
+                  disabled={isPending || Boolean(activeAction)}
                   onClick={() => generateBlog(topic)}
                   aria-label={`Approve ${topic.title}`}
                   title={`Approve ${topic.title}`}

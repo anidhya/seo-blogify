@@ -34,6 +34,14 @@ const topicSuggestionSchema = z.object({
     .min(1)
 });
 
+const manualTopicDetailsSchema = z.object({
+  primaryKeyword: z.string(),
+  searchIntent: z.string(),
+  rankingRationale: z.string(),
+  seoAngle: z.string(),
+  outline: z.array(z.string()).min(4).max(8)
+});
+
 const generatedBlogSchema = z.object({
   title: z.string(),
   slug: z.string(),
@@ -247,6 +255,41 @@ export async function generateTopicSuggestions(
   }
 
   return parsed.topics;
+}
+
+export async function generateManualTopicDetails(prompt: string, options?: { webSearch?: boolean }) {
+  const client = getClient();
+  const shouldUseWebSearch =
+    options?.webSearch ?? process.env.OPENAI_ENABLE_WEB_SEARCH !== "false";
+  const tools = shouldUseWebSearch ? [{ type: "web_search_preview" as const }] : [];
+
+  const response = await client.responses.parse({
+    model: defaultModel,
+    temperature: 0.3,
+    tools,
+    input: [
+      {
+        role: "developer",
+        content:
+          "You are an SEO strategist. Analyze the user's exact topic without renaming or rewriting it. Return only the keyword, search intent, ranking rationale, SEO angle, and outline that support the exact topic title."
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    text: {
+      format: zodTextFormat(manualTopicDetailsSchema, "manual_topic_details")
+    }
+  });
+
+  const parsed = response.output_parsed;
+
+  if (!parsed) {
+    throw new Error("Failed to parse manual topic details.");
+  }
+
+  return parsed;
 }
 
 export async function generateApprovedBlog(prompt: string) {
