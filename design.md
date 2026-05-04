@@ -193,6 +193,7 @@ Avoid stacked card shadows and heavy drop shadows.
 ### Topics
 
 - The topic queue should feel like an approval board.
+- Add a compact manual topic composer at the top of the queue when the page supports direct article generation. Keep it to one input, one CTA, and inline validation/status text.
 - Use a strong title, a short subtitle, and one action for topic generation.
 - Topic cards should expose the rationale, keyword, intent, and SEO angle.
 - Approval is a single high-confidence action per card.

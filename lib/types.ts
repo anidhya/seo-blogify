@@ -19,7 +19,6 @@ export type WorkflowInput = {
   companyName?: string;
   vision?: string;
   keywords?: string;
-  topicTitle?: string;
 };
 
 export type PageSnapshot = {

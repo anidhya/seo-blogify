@@ -6,6 +6,7 @@ import {
   evaluateBlogQuality,
   generateStructuredAnalysis,
   generateLinkedInDraft,
+  generateManualTopicDetails,
   generateTopicSuggestions,
   rewriteBlogDraft
 } from "@/lib/openai";
@@ -68,6 +69,7 @@ type RequestBody = {
   payload?: WorkflowInput & {
     analysis?: BrandAnalysis;
     selectedTopic?: TopicSuggestion;
+    manualTopic?: string;
   };
 };
 
@@ -432,6 +434,7 @@ function formatBlogStructurePrompt(params: {
   sitemapUrls: string[];
   internalLinkHints: string;
   topicResearch?: string | null;
+  manualTopicMode?: boolean;
 }) {
   const sections = [
     "Write a clean, structured, editorial blog post with no bloat or spam.",
@@ -445,6 +448,15 @@ function formatBlogStructurePrompt(params: {
     "Return 3 to 5 internal link suggestions tied to the available site URLs and existing blog coverage.",
     "Each internal link suggestion must include anchorText, targetUrl, placement, and rationale.",
     "Respond using the provided JSON schema.",
+    "",
+    params.manualTopicMode
+      ? [
+          "Manual topic mode is active.",
+          "Preserve the exact approved topic title below without renaming, reframing, or turning it into a different headline.",
+          `Exact topic title to preserve: ${params.topic.title}`,
+          "Use that exact title as the article title and H1. The rest of the article can expand on the topic, but the title text itself must remain identical."
+        ].join("\n")
+      : "",
     "",
     `Brand analysis:\n${JSON.stringify(params.analysis, null, 2)}`,
     "",
@@ -460,6 +472,36 @@ function formatBlogStructurePrompt(params: {
   }
 
   return sections.join("\n");
+}
+
+function normalizeManualBlogDraft(blog: Awaited<ReturnType<typeof generateApprovedBlog>>, exactTitle: string) {
+  const slug = exactTitle
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  const markdownLines = blog.markdown.split(/\r?\n/);
+  const firstNonEmptyLineIndex = markdownLines.findIndex((line) => line.trim().length > 0);
+  const nextMarkdown = [...markdownLines];
+
+  if (firstNonEmptyLineIndex >= 0 && nextMarkdown[firstNonEmptyLineIndex].trim().startsWith("# ")) {
+    nextMarkdown[firstNonEmptyLineIndex] = `# ${exactTitle}`;
+  } else {
+    nextMarkdown.unshift(`# ${exactTitle}`, "");
+  }
+
+  return {
+    ...blog,
+    title: exactTitle,
+    slug,
+    summary: blog.summary,
+    markdown: nextMarkdown.join("\n"),
+    meta: {
+      ...blog.meta,
+      title: exactTitle
+    }
+  };
 }
 
 function formatRewritePrompt(params: {
@@ -658,6 +700,90 @@ async function generateValidatedTopicSet(
   };
 }
 
+async function normalizeManualTopicSuggestion(params: {
+  run: Awaited<ReturnType<typeof loadRun>>;
+  manualTopic: string;
+}) {
+  if (!params.run.input || !params.run.research || !params.run.analysis) {
+    throw new Error("Saved run data is incomplete.");
+  }
+
+  const existingTopics = mergeExistingTopics(
+    params.run.existingTopics?.existingTopics ?? [],
+    deriveExistingTopics(params.run.research.homepage, params.run.research.blogs),
+    deriveExistingTopicsFromUrls(params.run.research.sitemapUrls ?? [])
+  );
+  const coverageBlock = formatExistingTopicsForPrompt(existingTopics);
+  const homepageText = `URL: ${params.run.research.homepage.url}\nTitle: ${params.run.research.homepage.title}\nExcerpt: ${params.run.research.homepage.excerpt}\nContent:\n${params.run.research.homepage.content}`;
+  const blogText = params.run.research.blogs
+    .map(
+      (blog, index) =>
+        `Blog ${index + 1}\nURL: ${blog.url}\nTitle: ${blog.title}\nExcerpt: ${blog.excerpt}\nContent:\n${blog.content}`
+    )
+    .join("\n\n");
+  let dataForSeoEvidence: string | null = null;
+  try {
+    dataForSeoEvidence = await buildDataForSeoTopicEvidence(params.run.input, params.run.analysis.analysis);
+  } catch {
+    dataForSeoEvidence = null;
+  }
+  const topicPrompt = [
+    "Analyze the user's exact topic for SEO planning.",
+    "Preserve the topic title exactly as written. Do not rename, rephrase, or rewrite it.",
+    "Return keyword analysis, search intent, ranking rationale, SEO angle, and a practical outline.",
+    "",
+    `Exact topic title: ${params.manualTopic}`,
+    "",
+    `Existing coverage:\n${coverageBlock}`,
+    "",
+    `Brand analysis:\n${JSON.stringify(params.run.analysis.analysis, null, 2)}`,
+    "",
+    formatResearchBlock(
+      params.run.input,
+      homepageText,
+      blogText,
+      params.run.research.sitemapUrls ?? [],
+      params.run.research.resolvedSitemapUrl ?? null
+    )
+  ];
+
+  if (dataForSeoEvidence) {
+    topicPrompt.push("", dataForSeoEvidence);
+  }
+
+  const topicDetails = await generateManualTopicDetails(topicPrompt.join("\n"), {
+    webSearch: !dataForSeoEvidence
+  });
+
+  const proposedTopic = {
+    title: params.manualTopic,
+    primaryKeyword: topicDetails.primaryKeyword,
+    searchIntent: topicDetails.searchIntent,
+    rankingRationale: topicDetails.rankingRationale,
+    seoAngle: topicDetails.seoAngle,
+    outline: topicDetails.outline
+  };
+
+  const validated = validateTopicCandidates(existingTopics, [proposedTopic]);
+  const accepted = validated.accepted[0];
+  const rejected = validated.rejected;
+
+  if (!accepted) {
+    const rejection = rejected[0];
+    throw new Error(
+      rejection
+        ? `Topic is too close to existing coverage: ${rejection.reason}`
+        : "Could not normalize the supplied topic."
+    );
+  }
+
+  return {
+    approvedTopic: accepted,
+    existingTopics,
+    dataForSeoEvidence
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as RequestBody;
@@ -745,9 +871,10 @@ export async function POST(request: Request) {
 
     if (step === "generate-blog") {
       const runId = body.runId;
-      if (!runId || !payload?.selectedTopic) {
+      const manualTopicMode = Boolean(payload?.manualTopic?.trim() && !payload?.selectedTopic);
+      if (!runId || (!payload?.selectedTopic && !payload?.manualTopic?.trim())) {
         return NextResponse.json(
-          { error: "Run ID and selected topic are required for blog generation." },
+          { error: "Run ID and a topic are required for blog generation." },
           { status: 400 }
         );
       }
@@ -757,10 +884,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Saved run data is incomplete." }, { status: 400 });
       }
 
-      const selectedTopic = payload.selectedTopic;
-      if (!selectedTopic) {
-        return NextResponse.json({ error: "Selected topic is required for blog generation." }, { status: 400 });
-      }
+      const selectedTopic = payload.selectedTopic
+        ? payload.selectedTopic
+        : await normalizeManualTopicSuggestion({
+            run,
+            manualTopic: payload.manualTopic?.trim() ?? ""
+          }).then((result) => result.approvedTopic);
 
       await setProgress(runId, "generate-blog", 10, "Assembling blog prompt");
       const homepageText = `URL: ${run.research.homepage.url}\nTitle: ${run.research.homepage.title}\nExcerpt: ${run.research.homepage.excerpt}\nContent:\n${run.research.homepage.content}`;
@@ -788,11 +917,15 @@ export async function POST(request: Request) {
         blogText,
         sitemapUrls: run.research.sitemapUrls ?? [],
         internalLinkHints: formatInternalLinkHints(run),
-        topicResearch: run.topicResearch?.evidence ?? null
+        topicResearch: run.topicResearch?.evidence ?? null,
+        manualTopicMode
       });
 
       await setProgress(runId, "generate-blog", 35, "Drafting article and SEO assets");
       let blog = await generateApprovedBlog(blogPrompt);
+      if (manualTopicMode) {
+        blog = normalizeManualBlogDraft(blog, selectedTopic.title);
+      }
       await setProgress(runId, "generate-blog", 60, "Running quality review");
       let quality = await evaluateBlogQuality(
         formatBlogQualityPrompt({
@@ -815,6 +948,9 @@ export async function POST(request: Request) {
             attempt: attempts
           })
         );
+        if (manualTopicMode) {
+          blog = normalizeManualBlogDraft(blog, selectedTopic.title);
+        }
         await setProgress(runId, "generate-blog", 82 + attempts * 4, "Rechecking quality");
         quality = await evaluateBlogQuality(
           formatBlogQualityPrompt({
