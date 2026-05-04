@@ -171,6 +171,14 @@ const blogQualitySchema = z.object({
     absenceOfAIFluff: z.number().min(0).max(100),
     brandConsistency: z.number().min(0).max(100)
   }),
+  guidelineReview: z
+    .object({
+      status: z.enum(["pass", "needs_revision", "not_available"]),
+      summary: z.string(),
+      matchedFiles: z.array(z.string()),
+      issues: z.array(z.string())
+    })
+    .nullable(),
   issues: z.array(z.string()),
   rewriteAttempts: z.number().int().min(0).max(3),
   notes: z.array(z.string())

@@ -37,6 +37,45 @@ export type ExistingTopic = {
   keywords: string[];
 };
 
+export type BrandGuidelineFile = {
+  fileId: string;
+  fileName: string;
+  extension: string;
+  mimeType: string;
+  checksum: string;
+  byteLength: number;
+  extractedText: string;
+  uploadedAt: string;
+};
+
+export type BrandGuidelinesSnapshot = {
+  snapshotId: string;
+  domain: string;
+  createdAt: string;
+  updatedAt: string;
+  sourceRunId: string | null;
+  summary: string;
+  guidanceText: string;
+  files: BrandGuidelineFile[];
+};
+
+export type RunBrandGuidelines = {
+  schemaVersion: "1";
+  runId: string;
+  domain: string;
+  snapshotId: string;
+  createdAt: string;
+  updatedAt: string;
+  snapshot: BrandGuidelinesSnapshot;
+};
+
+export type BrandGuidelineReview = {
+  status: "pass" | "needs_revision" | "not_available";
+  summary: string;
+  matchedFiles: string[];
+  issues: string[];
+};
+
 export type BrandAnalysis = {
   companySummary: string;
   audience: string;
@@ -89,6 +128,7 @@ export type BlogQuality = {
     absenceOfAIFluff: number;
     brandConsistency: number;
   };
+  guidelineReview: BrandGuidelineReview | null;
   issues: string[];
   rewriteAttempts: number;
   notes: string[];
@@ -401,6 +441,7 @@ export type RunSummary = {
   publishStatus: string | null;
   progressPercent: number | null;
   progressLabel: string | null;
+  hasBrandGuidelines: boolean;
 };
 
 export type GeneratedBlog = {

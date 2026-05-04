@@ -189,6 +189,8 @@ Avoid stacked card shadows and heavy drop shadows.
 - Keep the header compact, with the brand name and short status cues.
 - Step navigation should show analysis, topics, and articles clearly.
 - Use the workspace shell rather than custom page chrome.
+- Brand guidelines live in the analysis area as a compact upload-and-review panel and should feel attached to the brand, not a separate settings flow.
+- Long brand-guideline summaries should be collapsed by default and revealed through a details/expand control so the analysis area stays compact.
 
 ### Topics
 
@@ -211,6 +213,8 @@ Avoid stacked card shadows and heavy drop shadows.
 - The top summary card should communicate title, summary, quality score, publish status, and word count immediately.
 - The main editor card should behave like a review surface with Preview, Edit, Markdown, and HTML modes.
 - Use disclosure cards for SEO meta, key takeaways, image prompts, internal links, FAQ content, and history.
+- Show the active brand-guidelines snapshot in the article review sidebar with a short compliance note and a compact file list.
+- Keep long brand-guideline text behind disclosure in the sidebar so the article preview rail stays readable.
 - Keep the right rail action area sticky on large screens.
 - Use green for article-health cues and purple only where image prompts or LinkedIn handoff are involved.
 

@@ -32,6 +32,45 @@ export const existingTopicSchema = z.object({
   keywords: z.array(z.string())
 });
 
+export const brandGuidelineFileSchema = z.object({
+  fileId: z.string(),
+  fileName: z.string(),
+  extension: z.string(),
+  mimeType: z.string(),
+  checksum: z.string(),
+  byteLength: z.number(),
+  extractedText: z.string(),
+  uploadedAt: z.string()
+});
+
+export const brandGuidelinesSnapshotSchema = z.object({
+  snapshotId: z.string(),
+  domain: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  sourceRunId: z.string().nullable().default(null),
+  summary: z.string(),
+  guidanceText: z.string(),
+  files: z.array(brandGuidelineFileSchema)
+});
+
+export const runBrandGuidelinesSchema = z.object({
+  schemaVersion: z.literal("1"),
+  runId: z.string(),
+  domain: z.string(),
+  snapshotId: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  snapshot: brandGuidelinesSnapshotSchema
+});
+
+export const brandGuidelineReviewSchema = z.object({
+  status: z.enum(["pass", "needs_revision", "not_available"]),
+  summary: z.string(),
+  matchedFiles: z.array(z.string()),
+  issues: z.array(z.string())
+});
+
 export const brandAnalysisSchema = z.object({
   companySummary: z.string(),
   audience: z.string(),
@@ -91,6 +130,7 @@ export const blogQualitySchema = z.object({
     absenceOfAIFluff: z.number(),
     brandConsistency: z.number()
   }),
+  guidelineReview: brandGuidelineReviewSchema.nullable().default(null),
   issues: z.array(z.string()),
   rewriteAttempts: z.number(),
   notes: z.array(z.string())

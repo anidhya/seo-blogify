@@ -282,7 +282,7 @@ export default function HomePage() {
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && form.websiteUrl.trim() && !isPending) runAnalyze();
                       }}
-                      className="rounded-xl border border-black/10 bg-zinc-50 px-4 py-3.5 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-[#0f7b49]/35 focus:bg-white focus:ring-2 focus:ring-[#0f7b49]/10 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+                      className="rounded-xl border border-black/10 bg-zinc-50 px-4 py-3.5 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-[#0f7b49]/35 focus:bg-white focus:ring-2 focus:ring-[#0f7b49]/10 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:!bg-[#0f1115] dark:focus:border-[#4ade80]/30 dark:focus:ring-[#4ade80]/15"
                     />
                   </label>
 

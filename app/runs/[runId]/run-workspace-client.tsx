@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import BrandGuidelinesPanel from "./brand-guidelines-panel";
 import type { RunBundle } from "@/lib/storage";
 import type { BrandAnalysis } from "@/lib/types";
 
@@ -576,6 +577,14 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
                 </div>
               )}
             </div>
+          </Section>
+
+          <Section title="Brand Guidelines" icon="📎">
+            <BrandGuidelinesPanel
+              runId={runId}
+              domain={domain || "this brand"}
+              initialGuidelines={run.brandGuidelines}
+            />
           </Section>
 
           {/* SEO Observations */}
