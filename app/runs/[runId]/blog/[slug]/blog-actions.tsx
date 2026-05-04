@@ -9,6 +9,7 @@ type Props = {
   runId: string;
   slug: string;
   canApprove: boolean;
+  guidelineReviewStatus?: "pass" | "needs_revision" | "not_available";
 };
 
 type WorkflowResponse = {
@@ -35,7 +36,7 @@ async function postWorkflow(payload: Record<string, unknown>) {
   return data;
 }
 
-export default function BlogActions({ runId, slug, canApprove }: Props) {
+export default function BlogActions({ runId, slug, canApprove, guidelineReviewStatus = "not_available" }: Props) {
   const router = useRouter();
   const [regenerationComments, setRegenerationComments] = useState("");
   const [approvalNotes, setApprovalNotes] = useState("");
@@ -97,7 +98,11 @@ export default function BlogActions({ runId, slug, canApprove }: Props) {
 
   function submitApproval(approved: boolean) {
     if (approved && !canApprove) {
-      setError("The blog must pass the quality gate before it can be approved.");
+      setError(
+        guidelineReviewStatus === "needs_revision"
+          ? "The blog still conflicts with the uploaded brand guidelines."
+          : "The blog must pass the quality gate before it can be approved."
+      );
       return;
     }
 

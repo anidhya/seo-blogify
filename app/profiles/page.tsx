@@ -117,7 +117,7 @@ export default function ProfilesPage() {
             )}
             <Link
               href="/"
-              className="flex items-center gap-2 rounded-xl bg-[#0f172a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1e293b]"
+              className="inline-flex items-center gap-2 rounded-xl border border-[#0f7b49]/20 bg-[#0f7b49] px-4 py-2.5 text-sm font-semibold !text-white shadow-[0_8px_18px_rgba(15,123,73,0.16)] transition hover:-translate-y-0.5 hover:bg-[#0e6a40] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25"
             >
               <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
                 <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
@@ -162,7 +162,7 @@ export default function ProfilesPage() {
             <p className="mt-1 text-sm text-zinc-400">Create your first project to get started.</p>
             <Link
               href="/"
-              className="mt-4 rounded-xl bg-[#0f172a] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1e293b]"
+              className="mt-4 inline-flex items-center justify-center rounded-xl border border-[#0f7b49]/20 bg-[#0f7b49] px-5 py-2.5 text-sm font-semibold !text-white shadow-[0_8px_18px_rgba(15,123,73,0.16)] transition hover:-translate-y-0.5 hover:bg-[#0e6a40] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25"
             >
               Create a project
             </Link>
@@ -216,6 +216,11 @@ export default function ProfilesPage() {
                               {profile.companyName || "Untitled brand"}
                             </Link>
                             <StatusBadge status={profile.publishStatus} />
+                            {profile.hasBrandGuidelines && (
+                              <span className="rounded-full bg-[#0f7b49]/10 px-2.5 py-1 text-[11px] font-semibold text-[#0f7b49] dark:bg-[#0f7b49]/20 dark:text-[#86efac]">
+                                Guidelines
+                              </span>
+                            )}
                           </div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
                             <span>{timeAgo(profile.updatedAt)}</span>

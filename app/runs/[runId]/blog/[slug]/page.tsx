@@ -35,6 +35,10 @@ export default async function BlogPreviewPage({ params }: PageProps) {
   const canApprove = quality?.publishStatus === "publish_ready";
   const latestApproval = approvals[approvals.length - 1];
 
+  function formatDate(value: string) {
+    return new Date(value).toISOString().slice(0, 10);
+  }
+
   function DisclosureCard({
     id,
     title,
@@ -138,7 +142,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
           : [])
       ]}
     >
-      <section className="grid gap-5">
+      <section className="mx-auto grid w-full max-w-[1520px] gap-5 overflow-x-hidden px-4 py-5 md:px-6">
         <div className="rounded-[12px] border border-black/8 bg-white/70 p-4 shadow-[0_8px_18px_rgba(15,23,42,0.03)] dark:border-white/8 dark:bg-white/5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
@@ -166,8 +170,8 @@ export default async function BlogPreviewPage({ params }: PageProps) {
           </div>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_320px]">
-          <div className="grid gap-4">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
+          <div className="grid min-w-0 gap-4">
             <EditableArticleCard
               runId={runId}
               articleSlug={slug}
@@ -177,8 +181,77 @@ export default async function BlogPreviewPage({ params }: PageProps) {
             />
           </div>
 
-          <aside className="grid gap-4 xl:sticky xl:top-4 self-start">
-            <BlogActions runId={runId} slug={slug} canApprove={canApprove} />
+          <aside className="grid min-w-0 gap-4 self-start xl:sticky xl:top-4">
+            <BlogActions
+              runId={runId}
+              slug={slug}
+              canApprove={canApprove}
+              guidelineReviewStatus={quality?.guidelineReview?.status ?? "not_available"}
+            />
+
+            <DisclosureCard
+              id="brand-guidelines"
+              title="Brand Guidelines"
+              description={
+                run.brandGuidelines
+                  ? `Active snapshot ${run.brandGuidelines.snapshot.snapshotId} for ${run.brandGuidelines.domain}`
+                  : "No brand guideline files are attached to this brand."
+              }
+              copyLabel={run.brandGuidelines ? "Copy guidelines" : undefined}
+              copyText={
+                run.brandGuidelines
+                  ? [
+                      `Domain: ${run.brandGuidelines.domain}`,
+                      `Snapshot: ${run.brandGuidelines.snapshot.snapshotId}`,
+                      `Summary: ${run.brandGuidelines.snapshot.summary}`,
+                      `Files: ${run.brandGuidelines.snapshot.files.map((file) => file.fileName).join(", ")}`,
+                      `Guidance:\n${run.brandGuidelines.snapshot.guidanceText}`
+                    ].join("\n")
+                  : undefined
+              }
+              accentClass="border-[#0f7b49]/15 bg-[#0f7b49]/7 dark:border-[#0f7b49]/15 dark:bg-white/5"
+            >
+              {run.brandGuidelines ? (
+                <div className="grid gap-3">
+                  <div className="rounded-[12px] border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-white/5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500 dark:text-zinc-400">
+                      Review status
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-neutral-700 dark:text-zinc-300">
+                      {quality?.guidelineReview?.summary ??
+                        "This article is being evaluated against the uploaded brand guidelines on each draft and rewrite pass."}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-[#0f7b49]/10 px-3 py-1 text-xs font-medium text-[#0f7b49] dark:bg-white/10 dark:text-[#86efac]">
+                        {quality?.guidelineReview?.status ?? "not_available"}
+                      </span>
+                      <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 dark:bg-white/10 dark:text-zinc-300">
+                        {run.brandGuidelines.snapshot.files.length} file
+                        {run.brandGuidelines.snapshot.files.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    {run.brandGuidelines.snapshot.files.map((file) => (
+                      <div key={file.fileId} className="rounded-[12px] border border-black/10 bg-white/70 p-3 dark:border-white/8 dark:bg-white/5">
+                        <p className="text-sm font-medium text-neutral-900 dark:text-zinc-50">{file.fileName}</p>
+                        <p className="mt-1 text-xs text-neutral-500 dark:text-zinc-400">
+                          {file.extension.toUpperCase()} · {formatDate(file.uploadedAt)}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-zinc-400">
+                          {file.extractedText.slice(0, 180)}
+                          {file.extractedText.length > 180 ? "..." : ""}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm leading-6 text-neutral-600 dark:text-zinc-400">
+                  Upload brand guideline files in the workspace to make every article draft, quality review, and rewrite obey the brand rules.
+                </p>
+              )}
+            </DisclosureCard>
 
             <DisclosureCard
               id="seo"

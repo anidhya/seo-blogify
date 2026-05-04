@@ -13,6 +13,7 @@ Marketier AI is a Next.js app that turns a company website and supporting blog U
 - supports inline article editing in the preview screen
 - provides copy-to-clipboard actions for article sections, prompts, and link suggestions
 - runs a quality gate that rewrites drafts until they clear the editorial threshold
+- supports reusable brand-guidelines uploads by domain so article drafts, quality review, and rewrites stay aligned with uploaded files
 - supports regeneration with reviewer comments
 - prepares LinkedIn post packs after article approval, including a suggested title, suggested description, and 4 carousel prompts
 - generates LinkedIn carousel images with Google AI Studio from the approved carousel prompts and shows them on the LinkedIn page
@@ -118,6 +119,7 @@ Key files:
 - `regeneration-notes.json`
 - `approvals.json`
 - `linkedin.json`
+- `brand-guidelines.json`
 
 ## Notes
 

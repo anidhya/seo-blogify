@@ -3,6 +3,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { del as deleteBlob, get as getBlob, list as listBlobs, put as putBlob } from "@vercel/blob";
 import {
+  brandGuidelineFileSchema,
   approvedArticleSchema,
   approvedArticlesSchema,
   brandAnalysisSchema,
@@ -22,17 +23,19 @@ import {
   socialOAuthStateSchema,
   manifestSchema,
   pageSnapshotSchema,
-  researchSchema,
   topicResearchSchema,
   topicSuggestionSchema,
   topicValidationSchema,
   regenerationNoteSchema,
   workflowProgressSchema,
   topicListSchema,
-  workflowInputSchema
+  workflowInputSchema,
+  runBrandGuidelinesSchema
 } from "@/lib/schemas";
 import type {
   BrandAnalysis,
+  BrandGuidelineFile,
+  BrandGuidelinesSnapshot,
   ApprovedArticle,
   BlogRevision,
   BlogQuality,
@@ -55,6 +58,7 @@ import type {
   LinkedInSchedule,
   SocialProject,
   SocialOAuthState,
+  RunBrandGuidelines,
   SocialProjectSummary
 } from "@/lib/types";
 
@@ -66,6 +70,7 @@ const STORAGE_ROOT = process.env.DATA_ROOT
 const DATA_ROOT = path.join(STORAGE_ROOT, "runs");
 const LINKEDIN_ROOT = path.join(STORAGE_ROOT, "linkedin");
 const SOCIAL_ROOT = path.join(STORAGE_ROOT, "social");
+const BRAND_GUIDELINES_ROOT = path.join(STORAGE_ROOT, "brand-guidelines");
 const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
 const USE_BLOB_STORAGE = Boolean(BLOB_TOKEN);
 const SCHEMA_VERSION = "1" as const;
@@ -174,6 +179,10 @@ export type RunApprovedTopicRecord = {
   approvedTopic: TopicSuggestion;
 };
 
+export type RunBrandGuidelinesRecord = RunBrandGuidelines & {
+  schemaVersion: typeof SCHEMA_VERSION;
+};
+
 export type RunBlogRecord = {
   runId: string;
   schemaVersion: typeof SCHEMA_VERSION;
@@ -243,6 +252,7 @@ export type RunBundle = {
   approvedArticles: RunApprovedArticlesRecord | null;
   regenerationNotes: RunRegenerationNotesRecord | null;
   linkedin: RunLinkedInArticlesRecord | null;
+  brandGuidelines: RunBrandGuidelinesRecord | null;
 };
 
 function runDir(runId: string) {
@@ -471,6 +481,160 @@ async function writeTextFile(runId: string, fileName: string, value: string) {
   await writeFile(filePath(runId, fileName), value, "utf8");
 }
 
+function normalizeDomain(domain: string) {
+  return domain.trim().toLowerCase();
+}
+
+function brandGuidelinesDomainDir(domain: string) {
+  return path.join(BRAND_GUIDELINES_ROOT, normalizeDomain(domain));
+}
+
+function brandGuidelinesDomainPath(domain: string, fileName: string) {
+  return path.join(brandGuidelinesDomainDir(domain), fileName);
+}
+
+async function ensureBrandGuidelinesDomainDir(domain: string) {
+  await mkdir(brandGuidelinesDomainDir(domain), { recursive: true });
+}
+
+async function writeBrandGuidelinesJson(domain: string, fileName: string, value: unknown) {
+  const payload = JSON.stringify(value, null, 2);
+  const targetPath = brandGuidelinesDomainPath(domain, fileName);
+
+  if (USE_BLOB_STORAGE) {
+    await putBlob(blobPath("brand-guidelines", normalizeDomain(domain), fileName), payload, {
+      access: "private",
+      allowOverwrite: true,
+      contentType: "application/json; charset=utf-8",
+      ...blobOptions()
+    });
+    return;
+  }
+
+  await mkdir(path.dirname(targetPath), { recursive: true });
+  await writeFile(targetPath, payload, "utf8");
+}
+
+async function readBrandGuidelinesJson<T>(domain: string, fileName: string): Promise<T | null> {
+  if (USE_BLOB_STORAGE) {
+    try {
+      const blob = await getBlob(blobPath("brand-guidelines", normalizeDomain(domain), fileName), {
+        access: "private",
+        useCache: false,
+        ...blobOptions()
+      });
+
+      if (!blob || blob.statusCode !== 200 || !blob.stream) {
+        return null;
+      }
+
+      const content = await new Response(blob.stream).text();
+      return JSON.parse(content) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    const content = await readFile(brandGuidelinesDomainPath(domain, fileName), "utf8");
+    return JSON.parse(content) as T;
+  } catch {
+    return null;
+  }
+}
+
+function getDomainFromWebsiteUrl(websiteUrl?: string | null) {
+  if (!websiteUrl) {
+    return null;
+  }
+
+  try {
+    return new URL(websiteUrl).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+export async function loadLatestBrandGuidelines(domain: string) {
+  return readBrandGuidelinesJson<RunBrandGuidelinesRecord>(domain, "current.json");
+}
+
+export async function saveBrandGuidelinesSnapshot(
+  domain: string,
+  snapshot: Omit<BrandGuidelinesSnapshot, "snapshotId" | "createdAt" | "updatedAt" | "domain"> & {
+    snapshotId?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    sourceRunId?: string | null;
+  }
+) {
+  const timestamp = nowIso();
+  const snapshotId = snapshot.snapshotId ?? `bg-${randomUUID().slice(0, 8)}`;
+  const normalizedDomain = normalizeDomain(domain);
+  const files = snapshot.files.map((file) => brandGuidelineFileSchema.parse(file));
+  const record: RunBrandGuidelinesRecord = runBrandGuidelinesSchema.parse({
+    schemaVersion: SCHEMA_VERSION,
+    runId: snapshot.sourceRunId ?? `guidelines-${normalizedDomain}`,
+    domain: normalizedDomain,
+    snapshotId,
+    createdAt: snapshot.createdAt ?? timestamp,
+    updatedAt: snapshot.updatedAt ?? timestamp,
+    snapshot: {
+      snapshotId,
+      domain: normalizedDomain,
+      createdAt: snapshot.createdAt ?? timestamp,
+      updatedAt: snapshot.updatedAt ?? timestamp,
+      sourceRunId: snapshot.sourceRunId ?? null,
+      summary: snapshot.summary,
+      guidanceText: snapshot.guidanceText,
+      files
+    }
+  });
+
+  await writeBrandGuidelinesJson(domain, `snapshots/${snapshotId}.json`, record);
+  await writeBrandGuidelinesJson(domain, "current.json", record);
+  return record;
+}
+
+export async function saveRunBrandGuidelines(runId: string, brandGuidelines: RunBrandGuidelinesRecord | null) {
+  if (!brandGuidelines) {
+    return null;
+  }
+
+  const record = runBrandGuidelinesSchema.parse(brandGuidelines);
+  await writeJson(runId, "brand-guidelines.json", record);
+  return record;
+}
+
+export async function loadRunBrandGuidelines(runId: string) {
+  return readJson<RunBrandGuidelinesRecord>(runId, "brand-guidelines.json");
+}
+
+export async function removeBrandGuidelineFile(domain: string, fileId: string) {
+  const current = await loadLatestBrandGuidelines(domain);
+  if (!current) {
+    return null;
+  }
+
+  const nextFiles = current.snapshot.files.filter((file) => file.fileId !== fileId);
+  if (nextFiles.length === current.snapshot.files.length) {
+    return current;
+  }
+
+  const nextGuidanceText = nextFiles.map((file) => file.extractedText.trim()).filter(Boolean).join("\n\n");
+  const nextSummary = nextFiles.length
+    ? `Brand guidelines from ${nextFiles.length} file${nextFiles.length === 1 ? "" : "s"}`
+    : "No brand guideline files uploaded.";
+
+  return saveBrandGuidelinesSnapshot(domain, {
+    snapshotId: `bg-${randomUUID().slice(0, 8)}`,
+    sourceRunId: current.snapshot.sourceRunId,
+    summary: nextSummary,
+    guidanceText: nextGuidanceText,
+    files: nextFiles
+  });
+}
+
 async function listRunIdsFromBlobs() {
   const runIds = new Set<string>();
   let cursor: string | undefined;
@@ -614,6 +778,17 @@ export async function createRun(input: WorkflowInput, model: string) {
 
   await writeJson(runId, "input.json", inputRecord);
   await writeJson(runId, "manifest.json", manifest);
+
+  const domain = getDomainFromWebsiteUrl(input.websiteUrl);
+  if (domain) {
+    const latestGuidelines = await loadLatestBrandGuidelines(domain);
+    if (latestGuidelines) {
+      await saveRunBrandGuidelines(runId, {
+        ...latestGuidelines,
+        runId
+      });
+    }
+  }
 
   return { runId, input: inputRecord, manifest };
 }
@@ -1196,6 +1371,7 @@ export async function loadRun(runId: string): Promise<RunBundle> {
   const approvedArticlesRaw = await readJson<RunApprovedArticlesRecord>(runId, "approved-articles.json");
   const regenerationNotes = await readJson<RunRegenerationNotesRecord>(runId, "regeneration-notes.json");
   const linkedin = await readJson<RunLinkedInArticlesRecord>(runId, "linkedin.json");
+  const brandGuidelines = await loadRunBrandGuidelines(runId);
 
   return {
     manifest,
@@ -1214,7 +1390,8 @@ export async function loadRun(runId: string): Promise<RunBundle> {
     approvals,
     approvedArticles: approvedArticlesRaw ? approvedArticlesSchema.parse(approvedArticlesRaw) : null,
     regenerationNotes,
-    linkedin: linkedin ? linkedInArticlesRecordSchema.parse(linkedin) : null
+    linkedin: linkedin ? linkedInArticlesRecordSchema.parse(linkedin) : null,
+    brandGuidelines: brandGuidelines ? runBrandGuidelinesSchema.parse(brandGuidelines) : null
   };
 }
 
@@ -1287,7 +1464,8 @@ export async function listRunSummaries(): Promise<RunSummary[]> {
         qualityScore: run.quality?.quality.score ?? null,
         publishStatus: run.quality?.quality.publishStatus ?? null,
         progressPercent: run.manifest?.progress?.percent ?? null,
-        progressLabel: run.manifest?.progress?.stageLabel ?? null
+        progressLabel: run.manifest?.progress?.stageLabel ?? null,
+        hasBrandGuidelines: Boolean(run.brandGuidelines)
       };
     })
     .filter((run) => Boolean(run.runId))

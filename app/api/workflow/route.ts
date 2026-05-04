@@ -11,6 +11,7 @@ import {
   rewriteBlogDraft
 } from "@/lib/openai";
 import { buildDataForSeoTopicEvidence, reviewTopicCandidatesAgainstSerp } from "@/lib/dataforseo";
+import { formatBrandGuidelinesForPrompt } from "@/lib/brand-guidelines";
 import { generateLinkedInCarouselImages } from "@/lib/google-ai";
 import {
   deriveExistingTopics,
@@ -410,18 +411,23 @@ function formatBlogQualityPrompt(params: {
   blog: Awaited<ReturnType<typeof generateApprovedBlog>>;
   analysis: BrandAnalysis;
   topic: TopicSuggestion;
+  brandGuidelines: Awaited<ReturnType<typeof loadRun>>["brandGuidelines"];
 }) {
   return [
     "Score this blog draft on how human, specific, and publication-ready it feels.",
     "Treat 80 as the minimum pass threshold.",
     "Return a score from 0 to 100 and identify the weakest areas.",
-    "Evaluate sentence variety, specificity, transitions, repetition, concrete examples, AI fluff, brand consistency, structure, and bloat.",
+    "Evaluate sentence variety, specificity, transitions, repetition, concrete examples, AI fluff, brand consistency, structure, bloat, and brand guideline adherence.",
+    "If brand guidelines are provided, use them as the primary editorial standard. If there are no brand guidelines, set guidelineReview.status to not_available.",
+    "When brand guidelines exist, populate guidelineReview with a short summary, the matching file names, and any unmet requirements that would force a rewrite.",
     "",
     `Blog draft:\n${JSON.stringify(params.blog, null, 2)}`,
     "",
     `Brand analysis:\n${JSON.stringify(params.analysis, null, 2)}`,
     "",
-    `Approved topic:\n${JSON.stringify(params.topic, null, 2)}`
+    `Approved topic:\n${JSON.stringify(params.topic, null, 2)}`,
+    "",
+    formatBrandGuidelinesForPrompt(params.brandGuidelines)
   ].join("\n");
 }
 
@@ -429,6 +435,7 @@ function formatBlogStructurePrompt(params: {
   topic: TopicSuggestion;
   analysis: BrandAnalysis;
   input: WorkflowInput;
+  brandGuidelines: Awaited<ReturnType<typeof loadRun>>["brandGuidelines"];
   homepageText: string;
   blogText: string;
   sitemapUrls: string[];
@@ -442,6 +449,7 @@ function formatBlogStructurePrompt(params: {
     "Keep paragraphs short and concrete.",
     "Avoid generic AI phrasing, repeated claims, and filler transitions.",
     "Use the primary keyword naturally and support it with semantically related terms.",
+    "Apply brand guidelines exactly when they are present. If a brand guideline conflicts with a generic best practice, follow the brand guideline.",
     "Stay under 1200 words for the main article body.",
     "Use a consistent visual system for the 3 image prompts: same style, palette, lighting, and level of realism.",
     "Return exactly 3 image prompts.",
@@ -463,6 +471,8 @@ function formatBlogStructurePrompt(params: {
     `Approved topic:\n${JSON.stringify(params.topic, null, 2)}`,
     "",
     `Existing site content and link targets:\n${params.internalLinkHints}`,
+    "",
+    formatBrandGuidelinesForPrompt(params.brandGuidelines),
     "",
     formatResearchBlock(params.input, params.homepageText, params.blogText, params.sitemapUrls, null)
   ];
@@ -509,6 +519,7 @@ function formatRewritePrompt(params: {
   quality: Awaited<ReturnType<typeof evaluateBlogQuality>>;
   analysis: BrandAnalysis;
   topic: TopicSuggestion;
+  brandGuidelines: Awaited<ReturnType<typeof loadRun>>["brandGuidelines"];
   attempt: number;
 }) {
   return [
@@ -517,6 +528,7 @@ function formatRewritePrompt(params: {
     "Keep the same structure unless a section is causing the quality issues.",
     "Keep the post under 1200 words.",
     "Preserve the 3 image prompts and internal link suggestions unless they are clearly off-topic.",
+    "If brand guidelines are present, satisfy them before optimizing for generic style improvements.",
     "Return the full blog object in the same schema.",
     "",
     `Quality issues:\n${JSON.stringify(params.quality, null, 2)}`,
@@ -525,8 +537,18 @@ function formatRewritePrompt(params: {
     "",
     `Brand analysis:\n${JSON.stringify(params.analysis, null, 2)}`,
     "",
-    `Approved topic:\n${JSON.stringify(params.topic, null, 2)}`
+    `Approved topic:\n${JSON.stringify(params.topic, null, 2)}`,
+    "",
+    formatBrandGuidelinesForPrompt(params.brandGuidelines)
   ].join("\n");
+}
+
+function blogNeedsGuidelineRewrite(quality: Awaited<ReturnType<typeof evaluateBlogQuality>>) {
+  return quality.guidelineReview?.status === "needs_revision";
+}
+
+function getPublishStatusFromQuality(quality: Awaited<ReturnType<typeof evaluateBlogQuality>>) {
+  return quality.score >= 80 && !blogNeedsGuidelineRewrite(quality) ? "publish_ready" : "needs_review";
 }
 
 async function scoreAndPersistBlog(params: {
@@ -549,15 +571,17 @@ async function scoreAndPersistBlog(params: {
     formatBlogQualityPrompt({
       blog: params.blog,
       analysis: params.run.analysis.analysis,
-      topic: params.topic
+      topic: params.topic,
+      brandGuidelines: params.run.brandGuidelines
     })
   );
 
   const savedBlog = await saveBlog(params.runId, params.blog);
   const qualityPayload: BlogQuality = {
     score: quality.score,
-    publishStatus: quality.score >= 80 ? "publish_ready" : "needs_review",
+    publishStatus: getPublishStatusFromQuality(quality),
     evaluation: quality.evaluation,
+    guidelineReview: quality.guidelineReview,
     issues: quality.issues,
     rewriteAttempts: params.rewriteAttempts,
     notes: quality.notes
@@ -569,7 +593,7 @@ async function scoreAndPersistBlog(params: {
     blog: params.blog,
     quality: qualityPayload,
     wordCount: savedBlog.wordCount,
-    approvalStatus: quality.score >= 80 ? "pending" : "needs_revision",
+    approvalStatus: qualityPayload.publishStatus === "publish_ready" ? "pending" : "needs_revision",
     feedbackCount: params.comments ? 1 : 0
   });
 
@@ -583,11 +607,11 @@ async function scoreAndPersistBlog(params: {
   }
 
   await updateManifest(params.runId, {
-    status: quality.score >= 80 ? "publish_ready" : "needs_review",
+    status: qualityPayload.publishStatus === "publish_ready" ? "publish_ready" : "needs_review",
     steps: { approvedTopic: true, blog: true }
   });
 
-  return { quality: qualityPayload, publishStatus: quality.score >= 80 ? "publish_ready" : "needs_review" };
+  return { quality: qualityPayload, publishStatus: qualityPayload.publishStatus };
 }
 
 async function generateValidatedTopicSet(
@@ -913,6 +937,7 @@ export async function POST(request: Request) {
         topic: selectedTopic,
         analysis: run.analysis.analysis,
         input: run.input,
+        brandGuidelines: run.brandGuidelines,
         homepageText,
         blogText,
         sitemapUrls: run.research.sitemapUrls ?? [],
@@ -931,12 +956,13 @@ export async function POST(request: Request) {
         formatBlogQualityPrompt({
           blog,
           analysis: run.analysis.analysis,
-          topic: selectedTopic
+          topic: selectedTopic,
+          brandGuidelines: run.brandGuidelines
         })
       );
 
       let attempts = 0;
-      while (quality.score < 80 && attempts < 2) {
+      while ((quality.score < 80 || blogNeedsGuidelineRewrite(quality)) && attempts < 2) {
         attempts += 1;
         await setProgress(runId, "generate-blog", 70 + attempts * 5, `Rewrite pass ${attempts}`);
         blog = await rewriteBlogDraft(
@@ -945,6 +971,7 @@ export async function POST(request: Request) {
             quality,
             analysis: run.analysis.analysis,
             topic: selectedTopic,
+            brandGuidelines: run.brandGuidelines,
             attempt: attempts
           })
         );
@@ -956,7 +983,8 @@ export async function POST(request: Request) {
           formatBlogQualityPrompt({
             blog,
             analysis: run.analysis.analysis,
-            topic: selectedTopic
+            topic: selectedTopic,
+            brandGuidelines: run.brandGuidelines
           })
         );
       }
@@ -1239,6 +1267,7 @@ export async function POST(request: Request) {
             absenceOfAIFluff: 0,
             brandConsistency: 0
           },
+          guidelineReview: null,
           issues: [],
           rewriteAttempts: 0,
           notes: []
@@ -1264,12 +1293,14 @@ export async function POST(request: Request) {
         formatBlogStructurePrompt({
           topic: run.approvedTopic.approvedTopic,
           analysis: run.analysis.analysis,
-        input: run.input,
-        homepageText,
-        blogText,
-        sitemapUrls: run.research.sitemapUrls ?? [],
-        internalLinkHints: formatInternalLinkHints(run)
-      })
+          input: run.input,
+          brandGuidelines: run.brandGuidelines,
+          homepageText,
+          blogText,
+          sitemapUrls: run.research.sitemapUrls ?? [],
+          internalLinkHints: formatInternalLinkHints(run),
+          topicResearch: run.topicResearch?.evidence ?? null
+        })
       ].join("\n");
 
       await setProgress(runId, "regenerate-blog", 35, "Regenerating blog draft");
@@ -1279,12 +1310,13 @@ export async function POST(request: Request) {
         formatBlogQualityPrompt({
           blog,
           analysis: run.analysis.analysis,
-          topic: run.approvedTopic.approvedTopic
+          topic: run.approvedTopic.approvedTopic,
+          brandGuidelines: run.brandGuidelines
         })
       );
 
       let attempts = 0;
-      while (quality.score < 80 && attempts < 2) {
+      while ((quality.score < 80 || blogNeedsGuidelineRewrite(quality)) && attempts < 2) {
         attempts += 1;
         await setProgress(runId, "regenerate-blog", 70 + attempts * 5, `Rewrite pass ${attempts}`);
         blog = await rewriteBlogDraft(
@@ -1293,6 +1325,7 @@ export async function POST(request: Request) {
             quality,
             analysis: run.analysis.analysis,
             topic: run.approvedTopic.approvedTopic,
+            brandGuidelines: run.brandGuidelines,
             attempt: attempts
           })
         );
@@ -1301,7 +1334,8 @@ export async function POST(request: Request) {
           formatBlogQualityPrompt({
             blog,
             analysis: run.analysis.analysis,
-            topic: run.approvedTopic.approvedTopic
+            topic: run.approvedTopic.approvedTopic,
+            brandGuidelines: run.brandGuidelines
           })
         );
       }
@@ -1332,7 +1366,7 @@ export async function POST(request: Request) {
         blog,
         quality: {
           score: quality.score,
-          publishStatus: quality.score >= 80 ? "publish_ready" : "needs_review"
+          publishStatus: getPublishStatusFromQuality(quality)
         }
       });
     }
@@ -1354,7 +1388,9 @@ export async function POST(request: Request) {
       const articleSlug = body.articleSlug ?? run.blog.blog.slug;
       const articleBlog = run.blog.blog;
 
-      if (approved && (score === null || score < 80)) {
+      const guidelineStatus = run.quality?.quality.guidelineReview?.status ?? "not_available";
+
+      if (approved && (score === null || score < 80 || guidelineStatus === "needs_revision")) {
         return NextResponse.json(
           { error: "The blog must pass the quality gate before it can be approved." },
           { status: 400 }
@@ -1392,6 +1428,12 @@ export async function POST(request: Request) {
             concreteExamples: 0,
             absenceOfAIFluff: 0,
             brandConsistency: 0
+          },
+          guidelineReview: run.quality?.quality.guidelineReview ?? {
+            status: "not_available",
+            summary: "No brand guidelines available.",
+            matchedFiles: [],
+            issues: []
           },
           issues: [],
           rewriteAttempts: 0,
