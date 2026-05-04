@@ -14,6 +14,7 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 ## Common Commands
 
 - Install dependencies: `npm install`
+- Create local environment file: `cp .env.example .env.local`
 - Start dev server: `npm run dev`
 - Start production server after a build: `npm run start`
 - Lint: `npm run lint`
@@ -24,11 +25,13 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 
 - App routes and screens: `app/`
 - Social Studio and APIs: `app/social/`, `app/api/social/`
+- LinkedIn and Social Studio OAuth/connect routes: `app/api/linkedin/`, `app/api/social/[projectId]/connect/`, `app/api/social/connect/callback/`
 - Profile and FAQ screens: `app/profiles/`, `app/faq/`
 - Run workspace and article views: `app/runs/[runId]/`, `app/runs/[runId]/articles/`, `app/runs/[runId]/blog/[slug]/`, `app/runs/[runId]/blog/[slug]/linkedin/`
 - Shared UI components: `app/components/`
 - Route-specific components: near the route they support
 - Business logic and utilities: `lib/`
+- Reusable workflow skills: `skills/seo-friendly-topics/`, `skills/seo-friendly-articles/`, `skills/dataforseo-seo-research/`
 - Design guidance: `design.md`
 - Product summary and setup notes: `README.md`
 

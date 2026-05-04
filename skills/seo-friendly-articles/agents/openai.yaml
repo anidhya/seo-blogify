@@ -1,0 +1,7 @@
+interface:
+  display_name: "SEO Friendly Articles"
+  short_description: "Publication-ready blog drafts with quality gates"
+  default_prompt: "Use $seo-friendly-articles to turn an approved Marketier AI topic into a publication-ready blog draft with SEO metadata, FAQs, image prompts, internal links, and quality-gated rewrites."
+
+policy:
+  allow_implicit_invocation: true

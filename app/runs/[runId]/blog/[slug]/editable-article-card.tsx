@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import useWorkflowProgress from "@/lib/use-workflow-progress";
 import WorkflowProgressBar from "@/app/components/workflow-progress";
 import CopyButton from "./copy-button";
+import { copyTextToClipboard } from "@/lib/clipboard";
 
 type InternalLink = {
   anchorText: string;
@@ -117,11 +118,15 @@ function applyInternalLinks(text: string, links: InternalLink[]): ReactNode {
 function ImagePlaceholder({ prompt, index }: { prompt: string; index: number }) {
   const [copied, setCopied] = useState(false);
 
-  function copy() {
-    navigator.clipboard.writeText(prompt).then(() => {
+  async function copy() {
+    try {
+      await copyTextToClipboard(prompt);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    });
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch (error) {
+      console.warn("Image prompt copy failed:", error);
+      setCopied(false);
+    }
   }
 
   return (
