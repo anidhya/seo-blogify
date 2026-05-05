@@ -1354,24 +1354,45 @@ export async function updateManifest(
 }
 
 export async function loadRun(runId: string): Promise<RunBundle> {
-  const manifest = await readJson<RunManifest>(runId, "manifest.json");
-  const input = await readJson<RunInputRecord>(runId, "input.json");
-  const research = await readJson<RunResearchRecord>(runId, "research.json");
-  const analysis = await readJson<RunAnalysisRecord>(runId, "analysis.json");
-  const existingTopics = await readJson<RunExistingTopicsRecord>(runId, "existing-topics.json");
-  const topicCandidates = await readJson<RunTopicCandidatesRecord>(runId, "topic-candidates.json");
-  const topics = await readJson<RunTopicsRecord>(runId, "topics.json");
-  const topicValidation = await readJson<RunTopicValidationRecord>(runId, "topic-validation.json");
-  const topicResearch = await readJson<RunTopicResearchRecord>(runId, "topic-research.json");
-  const approvedTopic = await readJson<RunApprovedTopicRecord>(runId, "approved-topic.json");
-  const blog = await readJson<RunBlogRecord>(runId, "blog.json");
-  const quality = await readJson<RunQualityRecord>(runId, "quality.json");
-  const revisions = await readJson<RunRevisionsRecord>(runId, "blog-revisions.json");
-  const approvals = await readJson<RunApprovalsRecord>(runId, "approvals.json");
-  const approvedArticlesRaw = await readJson<RunApprovedArticlesRecord>(runId, "approved-articles.json");
-  const regenerationNotes = await readJson<RunRegenerationNotesRecord>(runId, "regeneration-notes.json");
-  const linkedin = await readJson<RunLinkedInArticlesRecord>(runId, "linkedin.json");
-  const brandGuidelines = await loadRunBrandGuidelines(runId);
+  const [
+    manifest,
+    input,
+    research,
+    analysis,
+    existingTopics,
+    topicCandidates,
+    topics,
+    topicValidation,
+    topicResearch,
+    approvedTopic,
+    blog,
+    quality,
+    revisions,
+    approvals,
+    approvedArticlesRaw,
+    regenerationNotes,
+    linkedin,
+    brandGuidelines
+  ] = await Promise.all([
+    readJson<RunManifest>(runId, "manifest.json"),
+    readJson<RunInputRecord>(runId, "input.json"),
+    readJson<RunResearchRecord>(runId, "research.json"),
+    readJson<RunAnalysisRecord>(runId, "analysis.json"),
+    readJson<RunExistingTopicsRecord>(runId, "existing-topics.json"),
+    readJson<RunTopicCandidatesRecord>(runId, "topic-candidates.json"),
+    readJson<RunTopicsRecord>(runId, "topics.json"),
+    readJson<RunTopicValidationRecord>(runId, "topic-validation.json"),
+    readJson<RunTopicResearchRecord>(runId, "topic-research.json"),
+    readJson<RunApprovedTopicRecord>(runId, "approved-topic.json"),
+    readJson<RunBlogRecord>(runId, "blog.json"),
+    readJson<RunQualityRecord>(runId, "quality.json"),
+    readJson<RunRevisionsRecord>(runId, "blog-revisions.json"),
+    readJson<RunApprovalsRecord>(runId, "approvals.json"),
+    readJson<RunApprovedArticlesRecord>(runId, "approved-articles.json"),
+    readJson<RunRegenerationNotesRecord>(runId, "regeneration-notes.json"),
+    readJson<RunLinkedInArticlesRecord>(runId, "linkedin.json"),
+    loadRunBrandGuidelines(runId)
+  ]);
 
   return {
     manifest,
