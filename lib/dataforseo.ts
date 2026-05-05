@@ -3,7 +3,6 @@ import type { BrandAnalysis, ExistingTopic, TopicSuggestion, TopicValidationReje
 const DATAFORSEO_API_BASE = "https://api.dataforseo.com/v3";
 const DEFAULT_LOCATION_CODE = Number(process.env.DATAFORSEO_LOCATION_CODE || "2840");
 const DEFAULT_LANGUAGE_CODE = process.env.DATAFORSEO_LANGUAGE_CODE || "en";
-let dataForSeoUnavailable = false;
 
 type DataForSeoTaskResponse<T> = {
   tasks?: Array<{
@@ -100,10 +99,6 @@ function formatCurrency(value: number | null | undefined) {
 }
 
 async function postDataForSeo<T>(endpoint: string, payload: unknown[]) {
-  if (dataForSeoUnavailable) {
-    throw new Error("DataForSEO is unavailable for this process.");
-  }
-
   const login = process.env.DATAFORSEO_LOGIN;
   const password = process.env.DATAFORSEO_PASSWORD;
 
@@ -121,9 +116,6 @@ async function postDataForSeo<T>(endpoint: string, payload: unknown[]) {
   });
 
   if (!response.ok) {
-    if (response.status === 403) {
-      dataForSeoUnavailable = true;
-    }
     throw new Error(`DataForSEO request failed with HTTP ${response.status}.`);
   }
 
@@ -229,6 +221,10 @@ function normalizeDomain(value: string) {
 }
 
 function isDataForSeo403Error(error: unknown) {
+  return error instanceof Error && error.message.includes("DataForSEO request failed with HTTP 403");
+}
+
+function isDataForSeoUnavailableError(error: unknown) {
   return error instanceof Error && error.message.includes("DataForSEO request failed with HTTP 403");
 }
 
@@ -374,7 +370,7 @@ export async function reviewTopicCandidatesAgainstSerp(params: {
 
       accepted.push(topic);
     } catch (error) {
-      if (!isDataForSeo403Error(error)) {
+      if (!isDataForSeoUnavailableError(error)) {
         console.warn("SERP overlap lookup failed:", error);
       }
       accepted.push(topic);
