@@ -3,6 +3,9 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import OpenAI from "openai";
+import { loadLocalEnv } from "./env.mjs";
+
+loadLocalEnv();
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -43,6 +46,24 @@ const brandGuidelinesRoot = path.join(dataRoot, "brand-guidelines");
 
 const DEFAULT_ORG_ID = "workspace-default";
 const DEFAULT_ORG_SLUG = "workspace";
+const RUN_ARTIFACT_TYPE_ALIASES = {
+  "analysis.json": "analysis",
+  "approved-articles.json": "approved-articles",
+  "approved-topic.json": "approved-topic",
+  "approvals.json": "approvals",
+  "blog-revisions.json": "blog-revisions",
+  "blog.json": "blog",
+  "brand-guidelines.json": "brand-guidelines",
+  "existing-topics.json": "existing-topics",
+  "linkedin.json": "linkedin",
+  "quality.json": "quality",
+  "regeneration-notes.json": "regeneration-notes",
+  "research.json": "research",
+  "topic-candidates.json": "topic-candidates",
+  "topic-research.json": "topic-research",
+  "topic-validation.json": "topic-validation",
+  "topics.json": "topics"
+};
 
 function nowIso() {
   return new Date().toISOString();
@@ -54,6 +75,10 @@ function normalizeDomain(domain) {
 
 function readJsonFile(filePath) {
   return readFile(filePath, "utf8").then((content) => JSON.parse(content));
+}
+
+function normalizeRunArtifactType(fileName) {
+  return RUN_ARTIFACT_TYPE_ALIASES[fileName] || fileName.replace(/\.json$/, "");
 }
 
 function chunkText(text, maxLength = 1200) {
@@ -293,6 +318,7 @@ async function backfillRuns() {
           if (!payload) {
             continue;
           }
+          const artifactType = normalizeRunArtifactType(artifactFile.name);
 
           const markdownPath = artifactFile.name === "blog.json" ? path.join(runDir, "blog.md") : null;
           let markdownText = null;
@@ -307,9 +333,9 @@ async function backfillRuns() {
           await sql`
             insert into run_artifacts (id, run_id, artifact_type, payload, markdown_text, created_at, updated_at)
             values (
-              ${`${runEntry.name}_${artifactFile.name}`},
+              ${`${runEntry.name}_${artifactType}`},
               ${runEntry.name},
-              ${artifactFile.name},
+              ${artifactType},
               ${JSON.stringify(payload)},
               ${markdownText},
               ${payload.createdAt || nowIso()},

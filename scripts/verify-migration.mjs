@@ -2,6 +2,9 @@ import postgres from "postgres";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { loadLocalEnv } from "./env.mjs";
+
+loadLocalEnv();
 
 const databaseUrl = process.env.DATABASE_URL;
 

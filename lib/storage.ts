@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { del as deleteBlob, list as listBlobs } from "@vercel/blob";
+import type { TransactionSql } from "postgres";
 import { getDb } from "@/lib/db/client";
 import {
   brandGuidelineFileSchema,
@@ -34,7 +35,6 @@ import {
   workflowInputSchema,
   runBrandGuidelinesSchema
 } from "@/lib/schemas";
-import type { Manifest } from "@/lib/schemas";
 import type {
   BrandAnalysis,
   BrandGuidelineFile,
@@ -332,7 +332,7 @@ function normalizeManifest(manifest: unknown) {
   };
 
   const parsed = manifestSchema.safeParse(candidate);
-  return parsed.success ? parsed.data : (candidate as Manifest);
+  return parsed.success ? parsed.data : null;
 }
 
 function normalizeArtifactRecord<T>(value: unknown) {
@@ -357,7 +357,26 @@ function runBrandGuidelinesArtifactId(runId: string) {
 }
 
 function normalizeArtifactTypeKey(artifactType: string) {
-  return artifactType.endsWith(".json") ? artifactType.slice(0, -5) : artifactType;
+  const aliasMap: Record<string, string> = {
+    "analysis.json": RUN_ANALYSIS_ARTIFACT_TYPE,
+    "approved-articles.json": RUN_APPROVED_ARTICLES_ARTIFACT_TYPE,
+    "approved-topic.json": RUN_APPROVED_TOPIC_ARTIFACT_TYPE,
+    "approvals.json": RUN_APPROVALS_ARTIFACT_TYPE,
+    "blog-revisions.json": RUN_REVISIONS_ARTIFACT_TYPE,
+    "blog.json": RUN_BLOG_ARTIFACT_TYPE,
+    "brand-guidelines.json": RUN_BRAND_GUIDELINES_ARTIFACT_TYPE,
+    "existing-topics.json": RUN_EXISTING_TOPICS_ARTIFACT_TYPE,
+    "linkedin.json": RUN_LINKEDIN_ARTIFACT_TYPE,
+    "quality.json": RUN_QUALITY_ARTIFACT_TYPE,
+    "regeneration-notes.json": RUN_REGENERATION_NOTES_ARTIFACT_TYPE,
+    "research.json": RUN_RESEARCH_ARTIFACT_TYPE,
+    "topic-candidates.json": RUN_TOPIC_CANDIDATES_ARTIFACT_TYPE,
+    "topic-research.json": RUN_TOPIC_RESEARCH_ARTIFACT_TYPE,
+    "topic-validation.json": RUN_TOPIC_VALIDATION_ARTIFACT_TYPE,
+    "topics.json": RUN_TOPICS_ARTIFACT_TYPE
+  };
+
+  return aliasMap[artifactType] ?? (artifactType.endsWith(".json") ? artifactType.slice(0, -5) : artifactType);
 }
 
 async function ensureDefaultOrganization() {
@@ -892,6 +911,32 @@ async function upsertRunArtifactToDb(
   return true;
 }
 
+async function upsertRunArtifactToDbTx(
+  tx: TransactionSql,
+  runId: string,
+  artifactType: string,
+  payload: unknown,
+  options?: { markdownText?: string | null; createdAt?: string; updatedAt?: string }
+) {
+  await ensureDefaultOrganization();
+  await tx`
+    insert into run_artifacts (id, run_id, artifact_type, payload, markdown_text, created_at, updated_at)
+    values (
+      ${`${runId}_${artifactType}`},
+      ${runId},
+      ${artifactType},
+      ${JSON.stringify(payload)},
+      ${options?.markdownText ?? null},
+      ${options?.createdAt || nowIso()},
+      ${options?.updatedAt || nowIso()}
+    )
+    on conflict (run_id, artifact_type) do update set
+      payload = excluded.payload,
+      markdown_text = excluded.markdown_text,
+      updated_at = excluded.updated_at
+  `;
+}
+
 async function loadRunArtifactsFromDb(runId: string) {
   const db = getDb();
   if (!db) {
@@ -916,9 +961,38 @@ async function loadRunArtifactsFromDb(runId: string) {
   return map;
 }
 
+async function loadRunArtifactFromDbTx<T>(tx: TransactionSql, runId: string, artifactType: string): Promise<T | null> {
+  const rows = await tx`
+    select payload
+    from run_artifacts
+    where run_id = ${runId}
+      and artifact_type = ${artifactType}
+    limit 1
+  `;
+
+  return normalizeDbJson(rows[0]?.payload) as T | null;
+}
+
 async function loadRunArtifactFromDb<T>(runId: string, artifactType: string): Promise<T | null> {
   const artifacts = await loadRunArtifactsFromDb(runId);
-  return (artifacts?.get(artifactType) as T | undefined) ?? null;
+  return normalizeDbJson(artifacts?.get(artifactType)) as T | null;
+}
+
+async function withRunArtifactLock<T>(
+  runId: string,
+  artifactType: string,
+  work: (tx: TransactionSql) => Promise<T>
+) {
+  const db = getDb();
+  if (!db) {
+    return null;
+  }
+
+  await ensureDefaultOrganization();
+  return db.begin(async (tx) => {
+    await tx`select pg_advisory_xact_lock(hashtext(${runId}), hashtext(${artifactType}))`;
+    return work(tx);
+  });
 }
 
 async function loadRunRowFromDb(runId: string) {
@@ -1087,39 +1161,42 @@ async function upsertApprovedArticle(
     feedbackCount?: number;
   }
 ) {
-  const current = (await loadRunArtifactFromDb<RunApprovedArticlesRecord>(runId, RUN_APPROVED_ARTICLES_ARTIFACT_TYPE)) ?? {
-    runId,
-    schemaVersion: SCHEMA_VERSION,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-    articles: []
-  };
+  return withRunArtifactLock(runId, RUN_APPROVED_ARTICLES_ARTIFACT_TYPE, async (tx) => {
+    const current =
+      (await loadRunArtifactFromDbTx<RunApprovedArticlesRecord>(tx, runId, RUN_APPROVED_ARTICLES_ARTIFACT_TYPE)) ?? {
+        runId,
+        schemaVersion: SCHEMA_VERSION,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+        articles: []
+      };
 
-  const timestamp = nowIso();
-  const existingArticle = current.articles.find((entry) => entry.articleSlug === article.articleSlug);
-  const nextArticle = approvedArticleSchema.parse({
-    articleId: article.articleId ?? article.articleSlug,
-    articleSlug: article.articleSlug,
-    createdAt: article.createdAt ?? timestamp,
-    updatedAt: article.updatedAt ?? timestamp,
-    topic: article.topic,
-    blog: article.blog,
-    quality: article.quality,
-    wordCount: article.wordCount,
-    approvalStatus: article.approvalStatus,
-    feedbackCount: article.feedbackCount ?? existingArticle?.feedbackCount ?? 0
+    const timestamp = nowIso();
+    const existingArticle = current.articles.find((entry) => entry.articleSlug === article.articleSlug);
+    const nextArticle = approvedArticleSchema.parse({
+      articleId: article.articleId ?? article.articleSlug,
+      articleSlug: article.articleSlug,
+      createdAt: article.createdAt ?? timestamp,
+      updatedAt: article.updatedAt ?? timestamp,
+      topic: article.topic,
+      blog: article.blog,
+      quality: article.quality,
+      wordCount: article.wordCount,
+      approvalStatus: article.approvalStatus,
+      feedbackCount: article.feedbackCount ?? existingArticle?.feedbackCount ?? 0
+    });
+
+    const record: RunApprovedArticlesRecord = approvedArticlesSchema.parse({
+      runId,
+      schemaVersion: SCHEMA_VERSION,
+      createdAt: current.createdAt,
+      updatedAt: timestamp,
+      articles: [...current.articles.filter((entry) => entry.articleSlug !== nextArticle.articleSlug), nextArticle]
+    });
+
+    await upsertRunArtifactToDbTx(tx, runId, RUN_APPROVED_ARTICLES_ARTIFACT_TYPE, record);
+    return record;
   });
-
-  const record: RunApprovedArticlesRecord = approvedArticlesSchema.parse({
-    runId,
-    schemaVersion: SCHEMA_VERSION,
-    createdAt: current.createdAt,
-    updatedAt: timestamp,
-    articles: [...current.articles.filter((entry) => entry.articleSlug !== nextArticle.articleSlug), nextArticle]
-  });
-
-  await upsertRunArtifactToDb(runId, RUN_APPROVED_ARTICLES_ARTIFACT_TYPE, record);
-  return record;
 }
 
 export function createRunId(companyName?: string) {
@@ -1352,93 +1429,99 @@ export async function saveBlogRevision(
   runId: string,
   revision: Omit<BlogRevision, "revisionId" | "createdAt"> & { revisionId?: string; createdAt?: string }
 ) {
-  const current = (await loadRunArtifactFromDb<RunRevisionsRecord>(runId, RUN_REVISIONS_ARTIFACT_TYPE)) ?? {
-    runId,
-    schemaVersion: SCHEMA_VERSION,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-    revisions: []
-  };
+  return withRunArtifactLock(runId, RUN_REVISIONS_ARTIFACT_TYPE, async (tx) => {
+    const current =
+      (await loadRunArtifactFromDbTx<RunRevisionsRecord>(tx, runId, RUN_REVISIONS_ARTIFACT_TYPE)) ?? {
+        runId,
+        schemaVersion: SCHEMA_VERSION,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+        revisions: []
+      };
 
-  const record: RunRevisionsRecord = {
-    runId,
-    schemaVersion: SCHEMA_VERSION,
-    createdAt: current.createdAt,
-    updatedAt: nowIso(),
-    revisions: [
-      ...current.revisions,
-      blogRevisionSchema.parse({
-        revisionId: revision.revisionId ?? `rev-${randomUUID().slice(0, 8)}`,
-        articleSlug: revision.articleSlug,
-        createdAt: revision.createdAt ?? nowIso(),
-        comments: revision.comments,
-        blog: revision.blog,
-        quality: revision.quality
-      })
-    ]
-  };
+    const record: RunRevisionsRecord = {
+      runId,
+      schemaVersion: SCHEMA_VERSION,
+      createdAt: current.createdAt,
+      updatedAt: nowIso(),
+      revisions: [
+        ...current.revisions,
+        blogRevisionSchema.parse({
+          revisionId: revision.revisionId ?? `rev-${randomUUID().slice(0, 8)}`,
+          articleSlug: revision.articleSlug,
+          createdAt: revision.createdAt ?? nowIso(),
+          comments: revision.comments,
+          blog: revision.blog,
+          quality: revision.quality
+        })
+      ]
+    };
 
-  await upsertRunArtifactToDb(runId, RUN_REVISIONS_ARTIFACT_TYPE, record);
-  return record;
+    await upsertRunArtifactToDbTx(tx, runId, RUN_REVISIONS_ARTIFACT_TYPE, record);
+    return record;
+  });
 }
 
 export async function saveRegenerationNote(runId: string, note: RegenerationNote) {
-  const current = (await loadRunArtifactFromDb<RunRegenerationNotesRecord>(runId, RUN_REGENERATION_NOTES_ARTIFACT_TYPE)) ?? {
-    runId,
-    schemaVersion: SCHEMA_VERSION,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-    notes: []
-  };
+  return withRunArtifactLock(runId, RUN_REGENERATION_NOTES_ARTIFACT_TYPE, async (tx) => {
+    const current =
+      (await loadRunArtifactFromDbTx<RunRegenerationNotesRecord>(tx, runId, RUN_REGENERATION_NOTES_ARTIFACT_TYPE)) ?? {
+        runId,
+        schemaVersion: SCHEMA_VERSION,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+        notes: []
+      };
 
-  const record: RunRegenerationNotesRecord = {
-    runId,
-    schemaVersion: SCHEMA_VERSION,
-    createdAt: current.createdAt,
-    updatedAt: nowIso(),
-    notes: [
-      ...current.notes,
-      regenerationNoteSchema.parse(note)
-    ]
-  };
+    const record: RunRegenerationNotesRecord = {
+      runId,
+      schemaVersion: SCHEMA_VERSION,
+      createdAt: current.createdAt,
+      updatedAt: nowIso(),
+      notes: [...current.notes, regenerationNoteSchema.parse(note)]
+    };
 
-  await upsertRunArtifactToDb(runId, RUN_REGENERATION_NOTES_ARTIFACT_TYPE, record);
-  return record;
+    await upsertRunArtifactToDbTx(tx, runId, RUN_REGENERATION_NOTES_ARTIFACT_TYPE, record);
+    return record;
+  });
 }
 
 export async function saveApproval(
   runId: string,
   approval: Omit<BlogApproval, "approvalId" | "createdAt"> & { approvalId?: string; createdAt?: string }
 ) {
-  const current = (await loadRunArtifactFromDb<RunApprovalsRecord>(runId, RUN_APPROVALS_ARTIFACT_TYPE)) ?? {
-    runId,
-    schemaVersion: SCHEMA_VERSION,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-    approvals: []
-  };
+  return withRunArtifactLock(runId, RUN_APPROVALS_ARTIFACT_TYPE, async (tx) => {
+    const current =
+      (await loadRunArtifactFromDbTx<RunApprovalsRecord>(tx, runId, RUN_APPROVALS_ARTIFACT_TYPE)) ?? {
+        runId,
+        schemaVersion: SCHEMA_VERSION,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+        approvals: []
+      };
 
-  const record: RunApprovalsRecord = {
-    runId,
-    schemaVersion: SCHEMA_VERSION,
-    createdAt: current.createdAt,
-    updatedAt: nowIso(),
-    approvals: [
-      ...current.approvals,
-      blogApprovalSchema.parse({
-        approvalId: approval.approvalId ?? `approval-${randomUUID().slice(0, 8)}`,
-        articleSlug: approval.articleSlug,
-        createdAt: approval.createdAt ?? nowIso(),
-        approved: approval.approved,
-        notes: approval.notes,
-        score: approval.score,
-        publishStatus: approval.publishStatus
-      })
-    ]
-  };
+    const record: RunApprovalsRecord = {
+      runId,
+      schemaVersion: SCHEMA_VERSION,
+      createdAt: current.createdAt,
+      updatedAt: nowIso(),
+      approvals: [
+        ...current.approvals,
+        blogApprovalSchema.parse({
+          approvalId: approval.approvalId ?? `approval-${randomUUID().slice(0, 8)}`,
+          articleSlug: approval.articleSlug,
+          createdAt: approval.createdAt ?? nowIso(),
+          approved: approval.approved,
+          notes: approval.notes,
+          score: approval.score,
+          publishStatus: approval.publishStatus
+        })
+      ]
+    };
 
-  await upsertRunArtifactToDb(runId, RUN_APPROVALS_ARTIFACT_TYPE, record);
-  return record;
+    await upsertRunArtifactToDbTx(tx, runId, RUN_APPROVALS_ARTIFACT_TYPE, record);
+    return record;
+  });
 }
 
 export async function saveApprovedArticle(
@@ -1460,48 +1543,51 @@ async function upsertLinkedInArticlesRecord(
   articleSlug: string,
   patch: Partial<LinkedInRecord>
 ) {
-  const current = (await loadRunArtifactFromDb<RunLinkedInArticlesRecord>(runId, RUN_LINKEDIN_ARTIFACT_TYPE)) ?? {
-    runId,
-    schemaVersion: SCHEMA_VERSION,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-    articles: []
-  };
+  return withRunArtifactLock(runId, RUN_LINKEDIN_ARTIFACT_TYPE, async (tx) => {
+    const current =
+      (await loadRunArtifactFromDbTx<RunLinkedInArticlesRecord>(tx, runId, RUN_LINKEDIN_ARTIFACT_TYPE)) ?? {
+        runId,
+        schemaVersion: SCHEMA_VERSION,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+        articles: []
+      };
 
-  const existingArticle =
-    current.articles.find((entry) => entry.articleSlug === articleSlug) ??
-    ({
+    const existingArticle =
+      current.articles.find((entry) => entry.articleSlug === articleSlug) ??
+      ({
+        articleSlug,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+        draft: null,
+        connection: null,
+        approvals: [],
+        schedule: null,
+        publication: null
+      } satisfies LinkedInRecord);
+
+    const nextArticle: LinkedInRecord = linkedInRecordSchema.parse({
       articleSlug,
-      createdAt: nowIso(),
+      createdAt: existingArticle.createdAt,
       updatedAt: nowIso(),
-      draft: null,
-      connection: null,
-      approvals: [],
-      schedule: null,
-      publication: null
-    } satisfies LinkedInRecord);
+      draft: patch.draft ?? existingArticle.draft,
+      connection: patch.connection ?? existingArticle.connection,
+      approvals: patch.approvals ?? existingArticle.approvals,
+      schedule: patch.schedule ?? existingArticle.schedule,
+      publication: patch.publication ?? existingArticle.publication
+    });
 
-  const nextArticle: LinkedInRecord = linkedInRecordSchema.parse({
-    articleSlug,
-    createdAt: existingArticle.createdAt,
-    updatedAt: nowIso(),
-    draft: patch.draft ?? existingArticle.draft,
-    connection: patch.connection ?? existingArticle.connection,
-    approvals: patch.approvals ?? existingArticle.approvals,
-    schedule: patch.schedule ?? existingArticle.schedule,
-    publication: patch.publication ?? existingArticle.publication
+    const record: RunLinkedInArticlesRecord = linkedInArticlesRecordSchema.parse({
+      runId,
+      schemaVersion: SCHEMA_VERSION,
+      createdAt: current.createdAt,
+      updatedAt: nowIso(),
+      articles: [...current.articles.filter((entry) => entry.articleSlug !== articleSlug), nextArticle]
+    });
+
+    await upsertRunArtifactToDbTx(tx, runId, RUN_LINKEDIN_ARTIFACT_TYPE, record);
+    return record;
   });
-
-  const record: RunLinkedInArticlesRecord = linkedInArticlesRecordSchema.parse({
-    runId,
-    schemaVersion: SCHEMA_VERSION,
-    createdAt: current.createdAt,
-    updatedAt: nowIso(),
-    articles: [...current.articles.filter((entry) => entry.articleSlug !== articleSlug), nextArticle]
-  });
-
-  await upsertRunArtifactToDb(runId, RUN_LINKEDIN_ARTIFACT_TYPE, record);
-  return record;
 }
 
 export async function saveLinkedInDraft(runId: string, draft: LinkedInDraft) {

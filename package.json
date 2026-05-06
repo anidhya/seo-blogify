@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:backfill": "node scripts/migrate-file-store-to-postgres.mjs",
+    "db:repair": "node scripts/repair-postgres-storage.mjs",
     "db:verify": "node scripts/verify-migration.mjs"
   },
   "dependencies": {
