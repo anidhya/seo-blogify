@@ -76,6 +76,7 @@ Important variables:
 
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL` defaults to `gpt-5.4-mini`
+- `OPENAI_EMBEDDING_MODEL` defaults to `text-embedding-3-small`
 - `OPENAI_ENABLE_WEB_SEARCH` can be set to `false` to disable web search for topic generation
 - `DATAFORSEO_LOGIN` and `DATAFORSEO_PASSWORD` enable DataForSEO-backed keyword and SERP evidence for topic generation
 - `DATAFORSEO_LOCATION_CODE` defaults to `2840` for United States
@@ -96,6 +97,9 @@ Important variables:
 - `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Google AI Studio image generation
 - `GOOGLE_IMAGE_MODEL` defaults to `gemini-3.1-flash-lite-preview`
 - `BLOB_READ_WRITE_TOKEN` enables persistent storage with Vercel Blob on deploy
+- `DATABASE_URL` connects the app to Railway Postgres
+- `DATABASE_SSL` defaults to `true` for hosted databases
+- `DATABASE_POOL_SIZE` controls the Postgres client pool size
 
 ## Workflow artifacts
 
@@ -120,6 +124,12 @@ Key files:
 - `approvals.json`
 - `linkedin.json`
 - `brand-guidelines.json`
+
+## PostgreSQL and pgvector
+
+- The repository now includes an initial PostgreSQL schema, a migration runner, and a file-store backfill script.
+- Brand guideline text can be chunked and embedded for pgvector-backed retrieval.
+- The file store remains the runtime source of truth until the DB-backed routes are switched over.
 
 ## Notes
 
