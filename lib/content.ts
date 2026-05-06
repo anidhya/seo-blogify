@@ -37,6 +37,25 @@ function sliceContent(text: string, maxChars = 9000) {
   return `${text.slice(0, maxChars)}...`;
 }
 
+function buildUnavailableSnapshot(url: string, reason: string): PageSnapshot {
+  let title = url;
+
+  try {
+    title = new URL(url).hostname;
+  } catch {
+    title = url;
+  }
+
+  const message = `Live page fetch failed for ${url}. Reason: ${reason}`;
+
+  return {
+    url,
+    title,
+    excerpt: message,
+    content: message
+  };
+}
+
 function normalizeUrl(url: string) {
   try {
     const parsed = new URL(url);
@@ -85,6 +104,20 @@ async function fetchText(url: string) {
     text: await response.text(),
     finalUrl: normalizeUrl(response.url || url)
   };
+}
+
+async function fetchPageSnapshotSafe(url: string) {
+  try {
+    return {
+      snapshot: await fetchPageSnapshot(url),
+      error: null
+    };
+  } catch (error) {
+    return {
+      snapshot: null,
+      error: error instanceof Error ? error.message : `Failed to fetch ${url}.`
+    };
+  }
 }
 
 type SitemapDiscovery = {
@@ -175,10 +208,18 @@ export async function collectResearch(inputUrl: string, blogUrls: string[]) {
   const sitemapUrls = sitemapDiscovery.urls;
   const sitemapBlogUrls = sitemapUrls.filter(isLikelyBlogUrl);
   const allBlogUrls = Array.from(new Set([...baseBlogUrls, ...sitemapBlogUrls]));
-  const snapshotUrls = [websiteUrl, ...allBlogUrls.slice(0, 20)];
+  const homepageResult = await fetchPageSnapshotSafe(websiteUrl);
+  const homepage =
+    homepageResult.snapshot ??
+    buildUnavailableSnapshot(
+      websiteUrl,
+      homepageResult.error || "The homepage could not be reached from this environment."
+    );
 
-  const snapshots = await Promise.all(snapshotUrls.map((url) => fetchPageSnapshot(url)));
-  const [homepage, ...blogs] = snapshots;
+  const blogSnapshotResults = await Promise.all(
+    allBlogUrls.slice(0, 20).map((url) => fetchPageSnapshotSafe(url))
+  );
+  const blogs = blogSnapshotResults.flatMap((result) => (result.snapshot ? [result.snapshot] : []));
 
   return {
     homepage,
