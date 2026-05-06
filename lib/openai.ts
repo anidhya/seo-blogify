@@ -195,6 +195,7 @@ function getClient() {
 }
 
 const defaultModel = process.env.OPENAI_MODEL || "gpt-5.4-mini";
+const defaultEmbeddingModel = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
 
 export async function generateStructuredAnalysis(prompt: string) {
   const client = getClient();
@@ -224,6 +225,16 @@ export async function generateStructuredAnalysis(prompt: string) {
   }
 
   return parsed;
+}
+
+export async function generateEmbedding(input: string | string[]) {
+  const client = getClient();
+  const response = await client.embeddings.create({
+    model: defaultEmbeddingModel,
+    input
+  });
+
+  return response.data.map((entry) => entry.embedding);
 }
 
 export async function generateTopicSuggestions(
