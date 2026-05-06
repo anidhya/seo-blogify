@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
-import { del as deleteBlob, get as getBlob, list as listBlobs, put as putBlob } from "@vercel/blob";
+import { del as deleteBlob, list as listBlobs } from "@vercel/blob";
 import { getDb } from "@/lib/db/client";
 import {
   brandGuidelineFileSchema,
@@ -34,6 +34,7 @@ import {
   workflowInputSchema,
   runBrandGuidelinesSchema
 } from "@/lib/schemas";
+import type { Manifest } from "@/lib/schemas";
 import type {
   BrandAnalysis,
   BrandGuidelineFile,
@@ -72,9 +73,7 @@ const STORAGE_ROOT = process.env.DATA_ROOT
     ? path.join("/tmp", "blogify-data")
     : path.join(process.cwd(), "data");
 const DATA_ROOT = path.join(STORAGE_ROOT, "runs");
-const LINKEDIN_ROOT = path.join(STORAGE_ROOT, "linkedin");
 const SOCIAL_ROOT = path.join(STORAGE_ROOT, "social");
-const BRAND_GUIDELINES_ROOT = path.join(STORAGE_ROOT, "brand-guidelines");
 const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
 const USE_BLOB_STORAGE = Boolean(BLOB_TOKEN);
 const SCHEMA_VERSION = "1" as const;
@@ -97,8 +96,6 @@ const RUN_APPROVALS_ARTIFACT_TYPE = "approvals";
 const RUN_APPROVED_ARTICLES_ARTIFACT_TYPE = "approved-articles";
 const RUN_REGENERATION_NOTES_ARTIFACT_TYPE = "regeneration-notes";
 const RUN_LINKEDIN_ARTIFACT_TYPE = "linkedin";
-const SOCIAL_PROJECT_ROOT_FILE = "project.json";
-const SOCIAL_OAUTH_ROOT_FILE = "oauth-states.json";
 
 type LinkedInOAuthState = {
   state: string;
@@ -284,10 +281,6 @@ function runDir(runId: string) {
   return path.join(DATA_ROOT, runId);
 }
 
-function filePath(runId: string, fileName: string) {
-  return path.join(runDir(runId), fileName);
-}
-
 function blobPath(...segments: string[]) {
   return path.posix.join(...segments);
 }
@@ -296,214 +289,55 @@ function blobOptions() {
   return BLOB_TOKEN ? { token: BLOB_TOKEN } : {};
 }
 
-async function ensureRunDir(runId: string) {
-  await mkdir(runDir(runId), { recursive: true });
-}
-
-async function writeJson(runId: string, fileName: string, value: unknown) {
-  const payload = JSON.stringify(value, null, 2);
-
-  if (USE_BLOB_STORAGE) {
-    await putBlob(blobPath("runs", runId, fileName), payload, {
-      access: "private",
-      allowOverwrite: true,
-      contentType: "application/json; charset=utf-8",
-      ...blobOptions()
-    });
-    return;
-  }
-
-  await ensureRunDir(runId);
-  await writeFile(filePath(runId, fileName), payload, "utf8");
-}
-
-async function readJson<T>(runId: string, fileName: string): Promise<T | null> {
-  if (USE_BLOB_STORAGE) {
-    try {
-      const blob = await getBlob(blobPath("runs", runId, fileName), {
-        access: "private",
-        useCache: false,
-        ...blobOptions()
-      });
-
-      if (!blob || blob.statusCode !== 200 || !blob.stream) {
-        return null;
-      }
-
-      const content = await new Response(blob.stream).text();
-      return JSON.parse(content) as T;
-    } catch {
-      return null;
-    }
-  }
-
-  try {
-    const content = await readFile(filePath(runId, fileName), "utf8");
-    return JSON.parse(content) as T;
-  } catch {
-    return null;
-  }
-}
-
 function nowIso() {
   return new Date().toISOString();
 }
 
-async function ensureLinkedInDir() {
-  await mkdir(LINKEDIN_ROOT, { recursive: true });
-}
-
-async function writeLinkedInJson(fileName: string, value: unknown) {
-  const payload = JSON.stringify(value, null, 2);
-
-  if (USE_BLOB_STORAGE) {
-    await putBlob(blobPath("linkedin", fileName), payload, {
-      access: "private",
-      allowOverwrite: true,
-      contentType: "application/json; charset=utf-8",
-      ...blobOptions()
-    });
-    return;
+function normalizeDbJson<T>(value: T | string | null | undefined): T | null {
+  if (value == null) {
+    return null;
   }
 
-  await ensureLinkedInDir();
-  await writeFile(path.join(LINKEDIN_ROOT, fileName), payload, "utf8");
-}
-
-async function ensureSocialDir() {
-  await mkdir(SOCIAL_ROOT, { recursive: true });
-}
-
-async function writeSocialJson(projectId: string, fileName: string, value: unknown) {
-  const payload = JSON.stringify(value, null, 2);
-
-  if (USE_BLOB_STORAGE) {
-    await putBlob(blobPath("social", projectId, fileName), payload, {
-      access: "private",
-      allowOverwrite: true,
-      contentType: "application/json; charset=utf-8",
-      ...blobOptions()
-    });
-    return;
-  }
-
-  await mkdir(path.join(SOCIAL_ROOT, projectId), { recursive: true });
-  await writeFile(path.join(SOCIAL_ROOT, projectId, fileName), payload, "utf8");
-}
-
-async function readSocialRootJson<T>(fileName: string) {
-  if (USE_BLOB_STORAGE) {
+  if (typeof value === "string") {
     try {
-      const blob = await getBlob(blobPath("social", fileName), {
-        access: "private",
-        useCache: false,
-        ...blobOptions()
-      });
-
-      if (!blob || blob.statusCode !== 200 || !blob.stream) {
-        return null;
-      }
-
-      const content = await new Response(blob.stream).text();
-      return JSON.parse(content) as T;
+      return JSON.parse(value) as T;
     } catch {
       return null;
     }
   }
 
-  try {
-    const content = await readFile(path.join(SOCIAL_ROOT, fileName), "utf8");
-    return JSON.parse(content) as T;
-  } catch {
+  return value;
+}
+
+function normalizeManifest(manifest: unknown) {
+  const payload = normalizeDbJson(manifest);
+  if (!payload || typeof payload !== "object") {
     return null;
   }
-}
 
-async function writeSocialRootJson(fileName: string, value: unknown) {
-  const payload = JSON.stringify(value, null, 2);
+  const value = payload as Record<string, unknown>;
+  const steps = (value.steps && typeof value.steps === "object" ? value.steps : {}) as Record<string, unknown>;
 
-  if (USE_BLOB_STORAGE) {
-    await putBlob(blobPath("social", fileName), payload, {
-      access: "private",
-      contentType: "application/json; charset=utf-8",
-      ...blobOptions()
-    });
-    return;
-  }
-
-  await mkdir(SOCIAL_ROOT, { recursive: true });
-  await writeFile(path.join(SOCIAL_ROOT, fileName), payload, "utf8");
-}
-
-async function readSocialJson<T>(projectId: string, fileName: string): Promise<T | null> {
-  if (USE_BLOB_STORAGE) {
-    try {
-      const blob = await getBlob(blobPath("social", projectId, fileName), {
-        access: "private",
-        useCache: false,
-        ...blobOptions()
-      });
-
-      if (!blob || blob.statusCode !== 200 || !blob.stream) {
-        return null;
-      }
-
-      const content = await new Response(blob.stream).text();
-      return JSON.parse(content) as T;
-    } catch {
-      return null;
+  const candidate = {
+    ...value,
+    steps: {
+      input: Boolean(steps.input ?? false),
+      research: Boolean(steps.research ?? false),
+      analysis: Boolean(steps.analysis ?? false),
+      topics: Boolean(steps.topics ?? false),
+      approvedTopic: Boolean(steps.approvedTopic ?? false),
+      blog: Boolean(steps.blog ?? false),
+      linkedin: Boolean(steps.linkedin ?? false)
     }
-  }
+  };
 
-  try {
-    const content = await readFile(path.join(SOCIAL_ROOT, projectId, fileName), "utf8");
-    return JSON.parse(content) as T;
-  } catch {
-    return null;
-  }
+  const parsed = manifestSchema.safeParse(candidate);
+  return parsed.success ? parsed.data : (candidate as Manifest);
 }
 
-async function readLinkedInJson<T>(fileName: string): Promise<T | null> {
-  if (USE_BLOB_STORAGE) {
-    try {
-      const blob = await getBlob(blobPath("linkedin", fileName), {
-        access: "private",
-        useCache: false,
-        ...blobOptions()
-      });
-
-      if (!blob || blob.statusCode !== 200 || !blob.stream) {
-        return null;
-      }
-
-      const content = await new Response(blob.stream).text();
-      return JSON.parse(content) as T;
-    } catch {
-      return null;
-    }
-  }
-
-  try {
-    const content = await readFile(path.join(LINKEDIN_ROOT, fileName), "utf8");
-    return JSON.parse(content) as T;
-  } catch {
-    return null;
-  }
-}
-
-async function writeTextFile(runId: string, fileName: string, value: string) {
-  if (USE_BLOB_STORAGE) {
-    await putBlob(blobPath("runs", runId, fileName), value, {
-      access: "private",
-      allowOverwrite: true,
-      contentType: "text/markdown; charset=utf-8",
-      ...blobOptions()
-    });
-    return;
-  }
-
-  await ensureRunDir(runId);
-  await writeFile(filePath(runId, fileName), value, "utf8");
+function normalizeArtifactRecord<T>(value: unknown) {
+  const payload = normalizeDbJson(value);
+  return payload as T | null;
 }
 
 function normalizeDomain(domain: string) {
@@ -520,6 +354,10 @@ function brandDocumentIdForSnapshot(snapshotId: string) {
 
 function runBrandGuidelinesArtifactId(runId: string) {
   return `brand_guidelines_${runId}`;
+}
+
+function normalizeArtifactTypeKey(artifactType: string) {
+  return artifactType.endsWith(".json") ? artifactType.slice(0, -5) : artifactType;
 }
 
 async function ensureDefaultOrganization() {
@@ -560,7 +398,7 @@ async function loadLatestBrandGuidelinesFromDb(domain: string) {
     limit 1
   `;
 
-  const snapshot = rows[0]?.snapshot ?? null;
+  const snapshot = normalizeDbJson(rows[0]?.snapshot) ?? null;
   return snapshot ? runBrandGuidelinesSchema.parse(snapshot) : null;
 }
 
@@ -666,7 +504,7 @@ async function loadRunBrandGuidelinesFromDb(runId: string) {
     limit 1
   `;
 
-  const payload = rows[0]?.payload ?? null;
+  const payload = normalizeDbJson(rows[0]?.payload) ?? null;
   return payload ? runBrandGuidelinesSchema.parse(payload) : null;
 }
 
@@ -761,10 +599,10 @@ async function loadSocialProjectFromDb(projectId: string) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     title: row.title,
-    source: row.source,
-    research: row.research,
+    source: normalizeDbJson(row.source) ?? row.source,
+    research: normalizeDbJson(row.research) ?? row.research,
     notes: row.notes,
-    platforms: row.platforms
+    platforms: normalizeDbJson(row.platforms) ?? row.platforms
   });
 }
 
@@ -1069,67 +907,28 @@ async function loadRunArtifactsFromDb(runId: string) {
   const map = new Map<string, unknown>();
   for (const row of rows) {
     map.set(row.artifact_type, row.payload);
+    const normalizedType = normalizeArtifactTypeKey(row.artifact_type);
+    if (normalizedType !== row.artifact_type) {
+      map.set(normalizedType, row.payload);
+    }
   }
 
   return map;
 }
 
-function brandGuidelinesDomainDir(domain: string) {
-  return path.join(BRAND_GUIDELINES_ROOT, normalizeDomain(domain));
+async function loadRunArtifactFromDb<T>(runId: string, artifactType: string): Promise<T | null> {
+  const artifacts = await loadRunArtifactsFromDb(runId);
+  return (artifacts?.get(artifactType) as T | undefined) ?? null;
 }
 
-function brandGuidelinesDomainPath(domain: string, fileName: string) {
-  return path.join(brandGuidelinesDomainDir(domain), fileName);
-}
-
-async function ensureBrandGuidelinesDomainDir(domain: string) {
-  await mkdir(brandGuidelinesDomainDir(domain), { recursive: true });
-}
-
-async function writeBrandGuidelinesJson(domain: string, fileName: string, value: unknown) {
-  const payload = JSON.stringify(value, null, 2);
-  const targetPath = brandGuidelinesDomainPath(domain, fileName);
-
-  if (USE_BLOB_STORAGE) {
-    await putBlob(blobPath("brand-guidelines", normalizeDomain(domain), fileName), payload, {
-      access: "private",
-      allowOverwrite: true,
-      contentType: "application/json; charset=utf-8",
-      ...blobOptions()
-    });
-    return;
-  }
-
-  await mkdir(path.dirname(targetPath), { recursive: true });
-  await writeFile(targetPath, payload, "utf8");
-}
-
-async function readBrandGuidelinesJson<T>(domain: string, fileName: string): Promise<T | null> {
-  if (USE_BLOB_STORAGE) {
-    try {
-      const blob = await getBlob(blobPath("brand-guidelines", normalizeDomain(domain), fileName), {
-        access: "private",
-        useCache: false,
-        ...blobOptions()
-      });
-
-      if (!blob || blob.statusCode !== 200 || !blob.stream) {
-        return null;
-      }
-
-      const content = await new Response(blob.stream).text();
-      return JSON.parse(content) as T;
-    } catch {
-      return null;
-    }
-  }
-
-  try {
-    const content = await readFile(brandGuidelinesDomainPath(domain, fileName), "utf8");
-    return JSON.parse(content) as T;
-  } catch {
+async function loadRunRowFromDb(runId: string) {
+  const db = getDb();
+  if (!db) {
     return null;
   }
+
+  const rows = await db`select * from runs where id = ${runId} limit 1`;
+  return rows[0] ?? null;
 }
 
 function getDomainFromWebsiteUrl(websiteUrl?: string | null) {
@@ -1146,11 +945,7 @@ function getDomainFromWebsiteUrl(websiteUrl?: string | null) {
 
 export async function loadLatestBrandGuidelines(domain: string) {
   const dbRecord = await loadLatestBrandGuidelinesFromDb(domain);
-  if (dbRecord) {
-    return dbRecord;
-  }
-
-  return readBrandGuidelinesJson<RunBrandGuidelinesRecord>(domain, "current.json");
+  return dbRecord;
 }
 
 export async function saveBrandGuidelinesSnapshot(
@@ -1186,8 +981,6 @@ export async function saveBrandGuidelinesSnapshot(
   });
 
   await saveBrandGuidelinesSnapshotToDb(record);
-  await writeBrandGuidelinesJson(domain, `snapshots/${snapshotId}.json`, record);
-  await writeBrandGuidelinesJson(domain, "current.json", record);
   return record;
 }
 
@@ -1198,17 +991,11 @@ export async function saveRunBrandGuidelines(runId: string, brandGuidelines: Run
 
   const record = runBrandGuidelinesSchema.parse(brandGuidelines);
   await saveRunBrandGuidelinesToDb(runId, record);
-  await writeJson(runId, "brand-guidelines.json", record);
   return record;
 }
 
 export async function loadRunBrandGuidelines(runId: string) {
-  const dbRecord = await loadRunBrandGuidelinesFromDb(runId);
-  if (dbRecord) {
-    return dbRecord;
-  }
-
-  return readJson<RunBrandGuidelinesRecord>(runId, "brand-guidelines.json");
+  return loadRunBrandGuidelinesFromDb(runId);
 }
 
 export async function removeBrandGuidelineFile(domain: string, fileId: string) {
@@ -1300,7 +1087,7 @@ async function upsertApprovedArticle(
     feedbackCount?: number;
   }
 ) {
-  const current = (await readJson<RunApprovedArticlesRecord>(runId, "approved-articles.json")) ?? {
+  const current = (await loadRunArtifactFromDb<RunApprovedArticlesRecord>(runId, RUN_APPROVED_ARTICLES_ARTIFACT_TYPE)) ?? {
     runId,
     schemaVersion: SCHEMA_VERSION,
     createdAt: nowIso(),
@@ -1331,7 +1118,6 @@ async function upsertApprovedArticle(
     articles: [...current.articles.filter((entry) => entry.articleSlug !== nextArticle.articleSlug), nextArticle]
   });
 
-  await writeJson(runId, "approved-articles.json", record);
   await upsertRunArtifactToDb(runId, RUN_APPROVED_ARTICLES_ARTIFACT_TYPE, record);
   return record;
 }
@@ -1378,8 +1164,6 @@ export async function createRun(input: WorkflowInput, model: string) {
     }
   };
 
-  await writeJson(runId, "input.json", inputRecord);
-  await writeJson(runId, "manifest.json", manifest);
   await upsertRunRowToDb({
     runId,
     model,
@@ -1425,7 +1209,6 @@ export async function saveResearch(
     resolvedSitemapUrl: research.resolvedSitemapUrl ?? null
   };
 
-  await writeJson(runId, "research.json", record);
   await upsertRunArtifactToDb(runId, RUN_RESEARCH_ARTIFACT_TYPE, record);
   return record;
 }
@@ -1440,7 +1223,6 @@ export async function saveExistingTopics(runId: string, existingTopics: Existing
     existingTopics: existingTopicSchema.array().parse(existingTopics)
   };
 
-  await writeJson(runId, "existing-topics.json", record);
   await upsertRunArtifactToDb(runId, RUN_EXISTING_TOPICS_ARTIFACT_TYPE, record);
   return record;
 }
@@ -1455,7 +1237,6 @@ export async function saveAnalysis(runId: string, analysis: BrandAnalysis) {
     analysis: brandAnalysisSchema.parse(analysis)
   };
 
-  await writeJson(runId, "analysis.json", record);
   await upsertRunArtifactToDb(runId, RUN_ANALYSIS_ARTIFACT_TYPE, record);
   return record;
 }
@@ -1470,7 +1251,6 @@ export async function saveTopics(runId: string, topics: TopicSuggestion[]) {
     topics: topicListSchema.parse(topics)
   };
 
-  await writeJson(runId, "topics.json", record);
   await upsertRunArtifactToDb(runId, RUN_TOPICS_ARTIFACT_TYPE, record);
   return record;
 }
@@ -1485,7 +1265,6 @@ export async function saveTopicCandidates(runId: string, topics: TopicSuggestion
     topics: topicListSchema.parse(topics)
   };
 
-  await writeJson(runId, "topic-candidates.json", record);
   await upsertRunArtifactToDb(runId, RUN_TOPIC_CANDIDATES_ARTIFACT_TYPE, record);
   return record;
 }
@@ -1500,7 +1279,6 @@ export async function saveTopicValidation(runId: string, validation: TopicValida
     validation: topicValidationSchema.parse(validation)
   };
 
-  await writeJson(runId, "topic-validation.json", record);
   await upsertRunArtifactToDb(runId, RUN_TOPIC_VALIDATION_ARTIFACT_TYPE, record);
   return record;
 }
@@ -1519,7 +1297,6 @@ export async function saveTopicResearch(runId: string, evidence: string) {
     }).evidence
   };
 
-  await writeJson(runId, "topic-research.json", record);
   await upsertRunArtifactToDb(runId, RUN_TOPIC_RESEARCH_ARTIFACT_TYPE, record);
   return record;
 }
@@ -1534,7 +1311,6 @@ export async function saveApprovedTopic(runId: string, approvedTopic: TopicSugge
     approvedTopic: topicSuggestionSchema.parse(approvedTopic)
   };
 
-  await writeJson(runId, "approved-topic.json", record);
   await upsertRunArtifactToDb(runId, RUN_APPROVED_TOPIC_ARTIFACT_TYPE, record);
   return record;
 }
@@ -1550,8 +1326,6 @@ export async function saveBlog(runId: string, blog: GeneratedBlog) {
     blog: generatedBlogSchema.parse(blog)
   };
 
-  await writeJson(runId, "blog.json", record);
-  await writeTextFile(runId, "blog.md", blog.markdown);
   await upsertRunArtifactToDb(runId, RUN_BLOG_ARTIFACT_TYPE, record, { markdownText: blog.markdown });
   return record;
 }
@@ -1566,20 +1340,19 @@ export async function saveQuality(runId: string, quality: BlogQuality) {
     quality: blogQualitySchema.parse(quality)
   };
 
-  await writeJson(runId, "quality.json", record);
   await upsertRunArtifactToDb(runId, RUN_QUALITY_ARTIFACT_TYPE, record);
   return record;
 }
 
 export async function loadRevisions(runId: string) {
-  return readJson<RunRevisionsRecord>(runId, "blog-revisions.json");
+  return loadRunArtifactFromDb<RunRevisionsRecord>(runId, RUN_REVISIONS_ARTIFACT_TYPE);
 }
 
 export async function saveBlogRevision(
   runId: string,
   revision: Omit<BlogRevision, "revisionId" | "createdAt"> & { revisionId?: string; createdAt?: string }
 ) {
-  const current = (await readJson<RunRevisionsRecord>(runId, "blog-revisions.json")) ?? {
+  const current = (await loadRunArtifactFromDb<RunRevisionsRecord>(runId, RUN_REVISIONS_ARTIFACT_TYPE)) ?? {
     runId,
     schemaVersion: SCHEMA_VERSION,
     createdAt: nowIso(),
@@ -1605,13 +1378,12 @@ export async function saveBlogRevision(
     ]
   };
 
-  await writeJson(runId, "blog-revisions.json", record);
   await upsertRunArtifactToDb(runId, RUN_REVISIONS_ARTIFACT_TYPE, record);
   return record;
 }
 
 export async function saveRegenerationNote(runId: string, note: RegenerationNote) {
-  const current = (await readJson<RunRegenerationNotesRecord>(runId, "regeneration-notes.json")) ?? {
+  const current = (await loadRunArtifactFromDb<RunRegenerationNotesRecord>(runId, RUN_REGENERATION_NOTES_ARTIFACT_TYPE)) ?? {
     runId,
     schemaVersion: SCHEMA_VERSION,
     createdAt: nowIso(),
@@ -1630,7 +1402,6 @@ export async function saveRegenerationNote(runId: string, note: RegenerationNote
     ]
   };
 
-  await writeJson(runId, "regeneration-notes.json", record);
   await upsertRunArtifactToDb(runId, RUN_REGENERATION_NOTES_ARTIFACT_TYPE, record);
   return record;
 }
@@ -1639,7 +1410,7 @@ export async function saveApproval(
   runId: string,
   approval: Omit<BlogApproval, "approvalId" | "createdAt"> & { approvalId?: string; createdAt?: string }
 ) {
-  const current = (await readJson<RunApprovalsRecord>(runId, "approvals.json")) ?? {
+  const current = (await loadRunArtifactFromDb<RunApprovalsRecord>(runId, RUN_APPROVALS_ARTIFACT_TYPE)) ?? {
     runId,
     schemaVersion: SCHEMA_VERSION,
     createdAt: nowIso(),
@@ -1666,7 +1437,6 @@ export async function saveApproval(
     ]
   };
 
-  await writeJson(runId, "approvals.json", record);
   await upsertRunArtifactToDb(runId, RUN_APPROVALS_ARTIFACT_TYPE, record);
   return record;
 }
@@ -1690,7 +1460,7 @@ async function upsertLinkedInArticlesRecord(
   articleSlug: string,
   patch: Partial<LinkedInRecord>
 ) {
-  const current = (await readJson<RunLinkedInArticlesRecord>(runId, "linkedin.json")) ?? {
+  const current = (await loadRunArtifactFromDb<RunLinkedInArticlesRecord>(runId, RUN_LINKEDIN_ARTIFACT_TYPE)) ?? {
     runId,
     schemaVersion: SCHEMA_VERSION,
     createdAt: nowIso(),
@@ -1730,7 +1500,7 @@ async function upsertLinkedInArticlesRecord(
     articles: [...current.articles.filter((entry) => entry.articleSlug !== articleSlug), nextArticle]
   });
 
-  await writeJson(runId, "linkedin.json", record);
+  await upsertRunArtifactToDb(runId, RUN_LINKEDIN_ARTIFACT_TYPE, record);
   return record;
 }
 
@@ -1752,7 +1522,7 @@ export async function saveLinkedInConnection(runId: string, articleSlug: string,
 }
 
 export async function saveLinkedInApproval(runId: string, articleSlug: string, approval: LinkedInApproval) {
-  const current = await readJson<RunLinkedInArticlesRecord>(runId, "linkedin.json");
+  const current = await loadRunArtifactFromDb<RunLinkedInArticlesRecord>(runId, RUN_LINKEDIN_ARTIFACT_TYPE);
   const existing = current?.articles.find((entry) => entry.articleSlug === articleSlug);
   const approvals = [
     ...(existing?.approvals ?? []).filter((entry) => entry.approvalId !== approval.approvalId),
@@ -1772,7 +1542,7 @@ export async function saveLinkedInApproval(runId: string, articleSlug: string, a
 }
 
 export async function saveLinkedInSchedule(runId: string, articleSlug: string, schedule: LinkedInSchedule) {
-  const current = await readJson<RunLinkedInArticlesRecord>(runId, "linkedin.json");
+  const current = await loadRunArtifactFromDb<RunLinkedInArticlesRecord>(runId, RUN_LINKEDIN_ARTIFACT_TYPE);
   const existing = current?.articles.find((entry) => entry.articleSlug === articleSlug);
 
   return upsertLinkedInArticlesRecord(runId, articleSlug, {
@@ -1787,7 +1557,7 @@ export async function saveLinkedInSchedule(runId: string, articleSlug: string, s
 }
 
 export async function saveLinkedInPublication(runId: string, articleSlug: string, publication: LinkedInPublication) {
-  const current = await readJson<RunLinkedInArticlesRecord>(runId, "linkedin.json");
+  const current = await loadRunArtifactFromDb<RunLinkedInArticlesRecord>(runId, RUN_LINKEDIN_ARTIFACT_TYPE);
   const existing = current?.articles.find((entry) => entry.articleSlug === articleSlug);
 
   return upsertLinkedInArticlesRecord(runId, articleSlug, {
@@ -1870,7 +1640,6 @@ export async function saveSocialProject(project: SocialProject) {
       await deleteOAuthConnectionFromDb("linkedin", "social_project_platform", `${record.projectId}:${platform.platform}`);
     }
   }
-  await writeSocialJson(record.projectId, "project.json", record);
   return record;
 }
 
@@ -1897,61 +1666,22 @@ export async function loadSocialProject(projectId: string) {
     };
   }
 
-  const record = await readSocialJson<SocialProject>(projectId, "project.json");
-  return record ? socialProjectSchema.parse(record) : null;
+  return null;
 }
 
 export async function saveSocialOAuthState(state: SocialOAuthState) {
-  const current = (await readSocialRootJson<{ states: SocialOAuthState[] }>(SOCIAL_OAUTH_ROOT_FILE)) ?? { states: [] };
-  const record = {
-    states: [
-      ...current.states.filter((entry) => entry.state !== state.state),
-      socialOAuthStateSchema.parse(state)
-    ]
-  };
-
   await saveSocialOAuthStateToDb(state);
-  await writeSocialRootJson(SOCIAL_OAUTH_ROOT_FILE, record);
-  return record;
+  return {
+    states: [socialOAuthStateSchema.parse(state)]
+  };
 }
 
 export async function loadSocialOAuthState(state: string) {
-  const dbState = await loadSocialOAuthStateFromDb(state);
-  if (dbState) {
-    return dbState;
-  }
-
-  const current = await readSocialRootJson<{ states: SocialOAuthState[] }>(SOCIAL_OAUTH_ROOT_FILE);
-  if (!current) {
-    return null;
-  }
-
-  const match = current.states.find((entry) => entry.state === state);
-  if (!match) {
-    return null;
-  }
-
-  if (new Date(match.expiresAt).getTime() < Date.now()) {
-    await deleteSocialOAuthState(state);
-    return null;
-  }
-
-  return socialOAuthStateSchema.parse(match);
+  return loadSocialOAuthStateFromDb(state);
 }
 
 export async function deleteSocialOAuthState(state: string) {
-  const current = await readSocialRootJson<{ states: SocialOAuthState[] }>(SOCIAL_OAUTH_ROOT_FILE);
-  if (!current) {
-    await deleteSocialOAuthStateFromDb(state);
-    return;
-  }
-
-  const record = {
-    states: current.states.filter((entry) => entry.state !== state)
-  };
-
   await deleteSocialOAuthStateFromDb(state);
-  await writeSocialRootJson(SOCIAL_OAUTH_ROOT_FILE, record);
 }
 
 export async function deleteSocialProject(projectId: string) {
@@ -2013,7 +1743,8 @@ export async function updateManifest(
     steps?: Partial<RunManifest["steps"]>;
   }
 ) {
-  const current = await readJson<RunManifest>(runId, "manifest.json");
+  const currentRow = await loadRunRowFromDb(runId);
+  const current = normalizeManifest(currentRow?.manifest);
   const timestamp = nowIso();
   const manifest: RunManifest = {
     runId,
@@ -2040,8 +1771,15 @@ export async function updateManifest(
   };
 
   const parsed = manifestSchema.parse(manifest);
-  await writeJson(runId, "manifest.json", parsed);
-  const currentInput = await readJson<RunInputRecord>(runId, "input.json");
+  const currentInput = currentRow?.input
+    ? {
+        runId,
+        schemaVersion: SCHEMA_VERSION,
+        createdAt: (currentRow as { created_at?: string })?.created_at ?? timestamp,
+        updatedAt: (currentRow as { updated_at?: string })?.updated_at ?? timestamp,
+        ...workflowInputSchema.parse(normalizeDbJson(currentRow.input) ?? currentRow.input)
+      }
+    : null;
   await upsertRunRowToDb({
     runId,
     model: parsed.model,
@@ -2054,135 +1792,98 @@ export async function updateManifest(
 
 export async function loadRun(runId: string): Promise<RunBundle> {
   const db = getDb();
-  if (db) {
-    const [runRows, artifacts, brandGuidelines] = await Promise.all([
-      db`select * from runs where id = ${runId} limit 1`,
-      loadRunArtifactsFromDb(runId),
-      loadRunBrandGuidelinesFromDb(runId)
-    ]);
-
-    const runRow = runRows[0] ?? null;
-    if (runRow) {
-      const createdAt = (runRow as { created_at: string }).created_at;
-      const updatedAt = (runRow as { updated_at: string }).updated_at;
-      const manifest = runRow.manifest ? manifestSchema.parse(runRow.manifest) : null;
-      const input = runRow.input
-        ? (workflowInputSchema.parse(runRow.input) as WorkflowInput) && {
-            runId: runRow.id,
-            schemaVersion: SCHEMA_VERSION,
-            createdAt,
-            updatedAt,
-            ...workflowInputSchema.parse(runRow.input)
-          }
-        : null;
-      const research = artifacts?.get(RUN_RESEARCH_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_RESEARCH_ARTIFACT_TYPE) as RunResearchRecord)
-        : null;
-      const existingTopics = artifacts?.get(RUN_EXISTING_TOPICS_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_EXISTING_TOPICS_ARTIFACT_TYPE) as RunExistingTopicsRecord)
-        : null;
-      const analysis = artifacts?.get(RUN_ANALYSIS_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_ANALYSIS_ARTIFACT_TYPE) as RunAnalysisRecord)
-        : null;
-      const topicCandidates = artifacts?.get(RUN_TOPIC_CANDIDATES_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_TOPIC_CANDIDATES_ARTIFACT_TYPE) as RunTopicCandidatesRecord)
-        : null;
-      const topics = artifacts?.get(RUN_TOPICS_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_TOPICS_ARTIFACT_TYPE) as RunTopicsRecord)
-        : null;
-      const topicValidation = artifacts?.get(RUN_TOPIC_VALIDATION_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_TOPIC_VALIDATION_ARTIFACT_TYPE) as RunTopicValidationRecord)
-        : null;
-      const topicResearch = artifacts?.get(RUN_TOPIC_RESEARCH_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_TOPIC_RESEARCH_ARTIFACT_TYPE) as RunTopicResearchRecord)
-        : null;
-      const approvedTopic = artifacts?.get(RUN_APPROVED_TOPIC_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_APPROVED_TOPIC_ARTIFACT_TYPE) as RunApprovedTopicRecord)
-        : null;
-      const blog = artifacts?.get(RUN_BLOG_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_BLOG_ARTIFACT_TYPE) as RunBlogRecord)
-        : null;
-      const quality = artifacts?.get(RUN_QUALITY_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_QUALITY_ARTIFACT_TYPE) as RunQualityRecord)
-        : null;
-      const revisions = artifacts?.get(RUN_REVISIONS_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_REVISIONS_ARTIFACT_TYPE) as RunRevisionsRecord)
-        : null;
-      const approvals = artifacts?.get(RUN_APPROVALS_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_APPROVALS_ARTIFACT_TYPE) as RunApprovalsRecord)
-        : null;
-      const approvedArticlesRaw = artifacts?.get(RUN_APPROVED_ARTICLES_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_APPROVED_ARTICLES_ARTIFACT_TYPE) as RunApprovedArticlesRecord)
-        : null;
-      const regenerationNotes = artifacts?.get(RUN_REGENERATION_NOTES_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_REGENERATION_NOTES_ARTIFACT_TYPE) as RunRegenerationNotesRecord)
-        : null;
-      const linkedin = artifacts?.get(RUN_LINKEDIN_ARTIFACT_TYPE)
-        ? (artifacts.get(RUN_LINKEDIN_ARTIFACT_TYPE) as RunLinkedInArticlesRecord)
-        : null;
-
-      return {
-        manifest,
-        input,
-        research,
-        existingTopics,
-        analysis,
-        topicCandidates,
-        topics,
-        topicValidation,
-        topicResearch,
-        approvedTopic,
-        blog,
-        quality,
-        revisions,
-        approvals,
-        approvedArticles: approvedArticlesRaw ? approvedArticlesSchema.parse(approvedArticlesRaw) : null,
-        regenerationNotes,
-        linkedin: linkedin ? linkedInArticlesRecordSchema.parse(linkedin) : null,
-        brandGuidelines: brandGuidelines ? runBrandGuidelinesSchema.parse(brandGuidelines) : null
-      };
-    }
+  if (!db) {
+    return {
+      manifest: null,
+      input: null,
+      research: null,
+      existingTopics: null,
+      analysis: null,
+      topicCandidates: null,
+      topics: null,
+      topicValidation: null,
+      topicResearch: null,
+      approvedTopic: null,
+      blog: null,
+      quality: null,
+      revisions: null,
+      approvals: null,
+      approvedArticles: null,
+      regenerationNotes: null,
+      linkedin: null,
+      brandGuidelines: null
+    };
   }
 
-  const [
-    manifest,
-    input,
-    research,
-    analysis,
-    existingTopics,
-    topicCandidates,
-    topics,
-    topicValidation,
-    topicResearch,
-    approvedTopic,
-    blog,
-    quality,
-    revisions,
-    approvals,
-    approvedArticlesRaw,
-    regenerationNotes,
-    linkedin,
-    brandGuidelines
-  ] = await Promise.all([
-    readJson<RunManifest>(runId, "manifest.json"),
-    readJson<RunInputRecord>(runId, "input.json"),
-    readJson<RunResearchRecord>(runId, "research.json"),
-    readJson<RunAnalysisRecord>(runId, "analysis.json"),
-    readJson<RunExistingTopicsRecord>(runId, "existing-topics.json"),
-    readJson<RunTopicCandidatesRecord>(runId, "topic-candidates.json"),
-    readJson<RunTopicsRecord>(runId, "topics.json"),
-    readJson<RunTopicValidationRecord>(runId, "topic-validation.json"),
-    readJson<RunTopicResearchRecord>(runId, "topic-research.json"),
-    readJson<RunApprovedTopicRecord>(runId, "approved-topic.json"),
-    readJson<RunBlogRecord>(runId, "blog.json"),
-    readJson<RunQualityRecord>(runId, "quality.json"),
-    readJson<RunRevisionsRecord>(runId, "blog-revisions.json"),
-    readJson<RunApprovalsRecord>(runId, "approvals.json"),
-    readJson<RunApprovedArticlesRecord>(runId, "approved-articles.json"),
-    readJson<RunRegenerationNotesRecord>(runId, "regeneration-notes.json"),
-    readJson<RunLinkedInArticlesRecord>(runId, "linkedin.json"),
-    loadRunBrandGuidelines(runId)
+  const [runRows, artifacts, brandGuidelines] = await Promise.all([
+    db`select * from runs where id = ${runId} limit 1`,
+    loadRunArtifactsFromDb(runId),
+    loadRunBrandGuidelinesFromDb(runId)
   ]);
+
+  const runRow = runRows[0] ?? null;
+  if (!runRow) {
+    return {
+      manifest: null,
+      input: null,
+      research: null,
+      existingTopics: null,
+      analysis: null,
+      topicCandidates: null,
+      topics: null,
+      topicValidation: null,
+      topicResearch: null,
+      approvedTopic: null,
+      blog: null,
+      quality: null,
+      revisions: null,
+      approvals: null,
+      approvedArticles: null,
+      regenerationNotes: null,
+      linkedin: null,
+      brandGuidelines: brandGuidelines
+        ? runBrandGuidelinesSchema.parse(normalizeDbJson(brandGuidelines) ?? brandGuidelines)
+        : null
+    };
+  }
+
+  const createdAt = (runRow as { created_at: string }).created_at;
+  const updatedAt = (runRow as { updated_at: string }).updated_at;
+  const manifest = normalizeManifest(runRow.manifest);
+  const input = runRow.input
+    ? {
+        runId: runRow.id,
+        schemaVersion: SCHEMA_VERSION,
+        createdAt,
+        updatedAt,
+        ...workflowInputSchema.parse(normalizeDbJson(runRow.input) ?? runRow.input)
+      }
+    : null;
+  const research = normalizeArtifactRecord<RunResearchRecord>(artifacts?.get(RUN_RESEARCH_ARTIFACT_TYPE));
+  const existingTopics = normalizeArtifactRecord<RunExistingTopicsRecord>(
+    artifacts?.get(RUN_EXISTING_TOPICS_ARTIFACT_TYPE)
+  );
+  const analysis = normalizeArtifactRecord<RunAnalysisRecord>(artifacts?.get(RUN_ANALYSIS_ARTIFACT_TYPE));
+  const topicCandidates = normalizeArtifactRecord<RunTopicCandidatesRecord>(
+    artifacts?.get(RUN_TOPIC_CANDIDATES_ARTIFACT_TYPE)
+  );
+  const topics = normalizeArtifactRecord<RunTopicsRecord>(artifacts?.get(RUN_TOPICS_ARTIFACT_TYPE));
+  const topicValidation = normalizeArtifactRecord<RunTopicValidationRecord>(
+    artifacts?.get(RUN_TOPIC_VALIDATION_ARTIFACT_TYPE)
+  );
+  const topicResearch = normalizeArtifactRecord<RunTopicResearchRecord>(artifacts?.get(RUN_TOPIC_RESEARCH_ARTIFACT_TYPE));
+  const approvedTopic = normalizeArtifactRecord<RunApprovedTopicRecord>(artifacts?.get(RUN_APPROVED_TOPIC_ARTIFACT_TYPE));
+  const blog = normalizeArtifactRecord<RunBlogRecord>(artifacts?.get(RUN_BLOG_ARTIFACT_TYPE));
+  const quality = normalizeArtifactRecord<RunQualityRecord>(artifacts?.get(RUN_QUALITY_ARTIFACT_TYPE));
+  const revisions = normalizeArtifactRecord<RunRevisionsRecord>(artifacts?.get(RUN_REVISIONS_ARTIFACT_TYPE));
+  const approvals = normalizeArtifactRecord<RunApprovalsRecord>(artifacts?.get(RUN_APPROVALS_ARTIFACT_TYPE));
+  const approvedArticlesRaw = normalizeArtifactRecord<RunApprovedArticlesRecord>(
+    artifacts?.get(RUN_APPROVED_ARTICLES_ARTIFACT_TYPE)
+  );
+  const regenerationNotes = normalizeArtifactRecord<RunRegenerationNotesRecord>(
+    artifacts?.get(RUN_REGENERATION_NOTES_ARTIFACT_TYPE)
+  );
+  const linkedin = normalizeArtifactRecord<RunLinkedInArticlesRecord>(artifacts?.get(RUN_LINKEDIN_ARTIFACT_TYPE));
 
   return {
     manifest,
@@ -2202,7 +1903,7 @@ export async function loadRun(runId: string): Promise<RunBundle> {
     approvedArticles: approvedArticlesRaw ? approvedArticlesSchema.parse(approvedArticlesRaw) : null,
     regenerationNotes,
     linkedin: linkedin ? linkedInArticlesRecordSchema.parse(linkedin) : null,
-    brandGuidelines: brandGuidelines ? runBrandGuidelinesSchema.parse(brandGuidelines) : null
+    brandGuidelines: brandGuidelines ? runBrandGuidelinesSchema.parse(normalizeDbJson(brandGuidelines) ?? brandGuidelines) : null
   };
 }
 
@@ -2235,16 +1936,9 @@ export async function saveLinkedInOAuthState(state: LinkedInOAuthState) {
     `;
   }
 
-  const current = (await readLinkedInJson<{ states: LinkedInOAuthState[] }>("oauth-states.json")) ?? {
-    states: []
+  return {
+    states: [state]
   };
-
-  const record = {
-    states: [...current.states.filter((entry) => entry.state !== state.state), state]
-  };
-
-  await writeLinkedInJson("oauth-states.json", record);
-  return record;
 }
 
 export async function loadLinkedInOAuthState(state: string) {
@@ -2270,9 +1964,7 @@ export async function loadLinkedInOAuthState(state: string) {
       } satisfies LinkedInOAuthState;
     }
   }
-
-  const current = await readLinkedInJson<{ states: LinkedInOAuthState[] }>("oauth-states.json");
-  return current?.states.find((entry) => entry.state === state) ?? null;
+  return null;
 }
 
 export async function deleteLinkedInOAuthState(state: string) {
@@ -2284,15 +1976,7 @@ export async function deleteLinkedInOAuthState(state: string) {
         and state = ${state}
     `;
   }
-
-  const current = await readLinkedInJson<{ states: LinkedInOAuthState[] }>("oauth-states.json");
-  if (!current) {
-    return null;
-  }
-
-  const next = { states: current.states.filter((entry) => entry.state !== state) };
-  await writeLinkedInJson("oauth-states.json", next);
-  return next;
+  return null;
 }
 
 export async function deleteLinkedInOAuthStatesForRun(runId: string) {
@@ -2304,15 +1988,7 @@ export async function deleteLinkedInOAuthStatesForRun(runId: string) {
         and entity_id like ${`${runId}:%`}
     `;
   }
-
-  const current = await readLinkedInJson<{ states: LinkedInOAuthState[] }>("oauth-states.json");
-  if (!current) {
-    return null;
-  }
-
-  const next = { states: current.states.filter((entry) => entry.runId !== runId) };
-  await writeLinkedInJson("oauth-states.json", next);
-  return next;
+  return null;
 }
 
 export async function deleteRun(runId: string) {
