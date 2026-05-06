@@ -322,6 +322,26 @@ async function backfillRuns() {
           `;
           importedArtifacts += 1;
         }
+
+        const brandGuidelinesPath = path.join(runDir, "brand-guidelines.json");
+        const brandGuidelines = await readJsonFile(brandGuidelinesPath).catch(() => null);
+        if (brandGuidelines) {
+          await sql`
+            insert into run_artifacts (id, run_id, artifact_type, payload, markdown_text, created_at, updated_at)
+            values (
+              ${`brand_guidelines_${runEntry.name}`},
+              ${runEntry.name},
+              ${"brand-guidelines"},
+              ${JSON.stringify(brandGuidelines)},
+              null,
+              ${brandGuidelines.createdAt || nowIso()},
+              ${brandGuidelines.updatedAt || nowIso()}
+            )
+            on conflict (run_id, artifact_type) do update set
+              payload = excluded.payload,
+              updated_at = excluded.updated_at
+          `;
+        }
       } catch (error) {
         console.warn(`Skipping run ${runEntry.name}:`, error?.message || error);
       }
@@ -336,6 +356,7 @@ async function backfillRuns() {
 async function backfillSocialProjects() {
   let importedProjects = 0;
   let importedPlatforms = 0;
+  let importedConnections = 0;
 
   try {
     const projectDirs = await readdir(socialRoot, { withFileTypes: true });
@@ -379,16 +400,58 @@ async function backfillSocialProjects() {
               updated_at = excluded.updated_at
           `;
           importedPlatforms += 1;
+
+          if (platform.connection) {
+            await sql`
+              insert into oauth_connections (
+                id, organization_id, entity_type, entity_id, provider, account_name, handle, account_id,
+                access_token, refresh_token, token_expires_at, scope, page_id, instagram_business_account_id,
+                profile_url, created_at, updated_at
+              )
+              values (
+                ${`${platform.connection.provider}_${project.projectId}_${platform.platform}`},
+                ${DEFAULT_ORG_ID},
+                ${"social_project_platform"},
+                ${`${project.projectId}:${platform.platform}`},
+                ${platform.connection.provider},
+                ${platform.connection.accountName},
+                ${platform.connection.handle},
+                ${platform.connection.accountId},
+                ${platform.connection.accessToken},
+                ${platform.connection.refreshToken},
+                ${platform.connection.tokenExpiresAt},
+                ${platform.connection.scope},
+                ${platform.connection.pageId},
+                ${platform.connection.instagramBusinessAccountId},
+                ${platform.connection.profileUrl},
+                ${platform.connection.connectedAt || nowIso()},
+                ${platform.connection.updatedAt || nowIso()}
+              )
+              on conflict (provider, entity_type, entity_id) do update set
+                account_name = excluded.account_name,
+                handle = excluded.handle,
+                account_id = excluded.account_id,
+                access_token = excluded.access_token,
+                refresh_token = excluded.refresh_token,
+                token_expires_at = excluded.token_expires_at,
+                scope = excluded.scope,
+                page_id = excluded.page_id,
+                instagram_business_account_id = excluded.instagram_business_account_id,
+                profile_url = excluded.profile_url,
+                updated_at = excluded.updated_at
+            `;
+            importedConnections += 1;
+          }
         }
       } catch (error) {
         console.warn(`Skipping social project ${projectEntry.name}:`, error?.message || error);
       }
     }
   } catch {
-    return { importedProjects, importedPlatforms };
+    return { importedProjects, importedPlatforms, importedConnections };
   }
 
-  return { importedProjects, importedPlatforms };
+  return { importedProjects, importedPlatforms, importedConnections };
 }
 
 async function ensureOAuthStates() {
@@ -403,7 +466,7 @@ async function ensureOAuthStates() {
           id, provider, state, entity_type, entity_id, redirect_uri, code_verifier, expires_at, created_at, updated_at
         )
         values (
-          ${`oauth_${state.state}`}, ${"linkedin"}, ${state.state}, ${"run"}, ${state.runId},
+          ${`oauth_${state.state}`}, ${"linkedin"}, ${state.state}, ${"run_article"}, ${`${state.runId}:${state.articleSlug}`},
           ${state.redirectUri}, ${null}, ${state.expiresAt}, ${state.createdAt || nowIso()}, ${nowIso()}
         )
         on conflict (state) do update set
@@ -445,18 +508,19 @@ await ensureOrg();
 
 const brandCount = await backfillBrandGuidelines();
 const { importedRuns, importedArtifacts } = await backfillRuns();
-const { importedProjects, importedPlatforms } = await backfillSocialProjects();
+const { importedProjects, importedPlatforms, importedConnections } = await backfillSocialProjects();
 await ensureOAuthStates();
 
 console.log(
   JSON.stringify(
-    {
-      brandCount,
-      importedRuns,
-      importedArtifacts,
-      importedProjects,
-      importedPlatforms
-    },
+      {
+        brandCount,
+        importedRuns,
+        importedArtifacts,
+        importedProjects,
+        importedPlatforms,
+        importedConnections
+      },
     null,
     2
   )

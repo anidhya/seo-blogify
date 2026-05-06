@@ -127,6 +127,8 @@ create index if not exists social_project_platforms_project_id_idx on social_pro
 create table if not exists oauth_connections (
   id text primary key,
   organization_id text references organizations(id) on delete cascade,
+  entity_type text not null default 'social_project_platform',
+  entity_id text not null default '',
   provider text not null check (provider in ('linkedin', 'instagram', 'x')),
   account_name text,
   handle text,
@@ -139,7 +141,8 @@ create table if not exists oauth_connections (
   instagram_business_account_id text,
   profile_url text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (provider, entity_type, entity_id)
 );
 
 create table if not exists oauth_states (
