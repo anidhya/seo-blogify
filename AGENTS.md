@@ -51,9 +51,8 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 - Keep React components small and focused.
 - Put route-specific logic in the route folder when that keeps the feature easier to follow.
 - Keep validation and schema changes aligned between `lib/schemas.ts`, route handlers, and UI consumers.
-- Treat storage changes carefully: local filesystem in development, Vercel Blob when configured for deployment.
-- Run workflow artifacts live under `data/runs/<runId>/` locally and `runs/<runId>/...` when Blob storage is enabled.
-- Social Studio persists project data under `data/social/<projectId>/` locally and `social/<projectId>/...` when Blob storage is enabled.
+- Treat storage changes carefully: Postgres-backed persistence is the source of truth through `DATABASE_URL`.
+- Run workflow and Social Studio data through the database-backed storage helpers in `lib/storage.ts`.
 
 ## UI Preferences
 
@@ -67,5 +66,5 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 
 - Run the smallest relevant check first, usually `npm run lint` or `npm run typecheck`.
 - If you changed a user-facing flow, verify the affected route locally if possible.
-- If you need local workflow data, copy `.env.example` to `.env.local` before starting the app.
+- If you need database access, copy `.env.example` to `.env.local` and set `DATABASE_URL` before starting the app.
 - Summarize the files changed and any follow-up validation that is still needed.

@@ -15,7 +15,7 @@ const faqs = [
   },
   {
     question: "Where do saved profiles live?",
-    answer: "Each workflow run is stored locally under data/runs/<runId>/ so the workspace can resume from saved state."
+    answer: "Each workflow run is stored in Postgres so the workspace can resume from saved state."
   }
 ];
 
