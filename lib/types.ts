@@ -96,6 +96,7 @@ export type BrandAnalysis = {
 export type TopicSuggestion = {
   title: string;
   primaryKeyword: string;
+  supportingKeywords: string[];
   searchIntent: string;
   rankingRationale: string;
   seoAngle: string;

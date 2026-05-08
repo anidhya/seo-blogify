@@ -22,6 +22,7 @@ import {
   normalizeTopicSuggestions,
   validateTopicCandidates
 } from "@/lib/topic-dedup";
+import { formatTopicKeywordCluster } from "@/lib/keyword-clusters";
 import type {
   BlogQuality,
   BrandAnalysis,
@@ -133,6 +134,7 @@ function buildLinkedInPrompt(params: {
   topic: TopicSuggestion;
   input: WorkflowInput;
 }) {
+  const keywordCluster = formatTopicKeywordCluster(params.topic);
   return [
     "Create a LinkedIn publishing pack from this approved article.",
     "Return exactly 4 carousel-ready slide prompts.",
@@ -150,6 +152,8 @@ function buildLinkedInPrompt(params: {
     "",
     `Approved topic:\n${JSON.stringify(params.topic, null, 2)}`,
     "",
+    `Keyword cluster:\nPrimary keyword: ${keywordCluster.primaryKeyword}\nSupporting keywords: ${keywordCluster.supportingKeywords.join(", ")}`,
+    "",
     `Brand analysis:\n${JSON.stringify(params.analysis, null, 2)}`,
     "",
     `Workflow input:\n${JSON.stringify(params.input, null, 2)}`
@@ -160,7 +164,8 @@ function buildFallbackLinkedInDraft(params: {
   blog: GeneratedBlog;
   topic: TopicSuggestion;
 }): LinkedInDraft {
-  const focus = params.topic.primaryKeyword || params.blog.meta.keywords[0] || params.blog.title;
+  const keywordCluster = formatTopicKeywordCluster(params.topic);
+  const focus = keywordCluster.primaryKeyword || params.blog.meta.keywords[0] || params.blog.title;
   const suggestedTitle = `${params.blog.title}`;
   const suggestedDescription = `${params.blog.summary}\n\nIf you're building around ${focus}, this carousel breaks the idea into a simple, usable framework.`;
 
@@ -228,9 +233,11 @@ async function generateLinkedInDraftForRun(params: {
   }
 
   const topic =
-    approvedArticle?.topic ?? params.run.approvedTopic?.approvedTopic ?? {
+    approvedArticle?.topic ??
+    params.run.approvedTopic?.approvedTopic ?? {
       title: articleBlog.title,
       primaryKeyword: articleBlog.meta.keywords[0] ?? articleBlog.title,
+      supportingKeywords: articleBlog.meta.keywords.slice(1, 6),
       searchIntent: "LinkedIn promotion",
       rankingRationale: "Approved article from the current run.",
       seoAngle: "Social distribution",
@@ -413,6 +420,7 @@ function formatBlogQualityPrompt(params: {
   topic: TopicSuggestion;
   brandGuidelines: Awaited<ReturnType<typeof loadRun>>["brandGuidelines"];
 }) {
+  const keywordCluster = formatTopicKeywordCluster(params.topic);
   return [
     "Score this blog draft on how human, specific, and publication-ready it feels.",
     "Treat 80 as the minimum pass threshold.",
@@ -426,6 +434,8 @@ function formatBlogQualityPrompt(params: {
     `Brand analysis:\n${JSON.stringify(params.analysis, null, 2)}`,
     "",
     `Approved topic:\n${JSON.stringify(params.topic, null, 2)}`,
+    "",
+    `Keyword cluster:\nPrimary keyword: ${keywordCluster.primaryKeyword}\nSupporting keywords: ${keywordCluster.supportingKeywords.join(", ")}`,
     "",
     formatBrandGuidelinesForPrompt(params.brandGuidelines)
   ].join("\n");
@@ -443,18 +453,20 @@ function formatBlogStructurePrompt(params: {
   topicResearch?: string | null;
   manualTopicMode?: boolean;
 }) {
+  const keywordCluster = formatTopicKeywordCluster(params.topic);
   const sections = [
     "Write a clean, structured, editorial blog post with no bloat or spam.",
     "Follow this structure: hook, answer-first intro, short orientation section like 'In this article', 3 to 6 strong H2 sections, concise takeaway block, FAQ, SEO meta, image prompts, and internal links.",
     "Keep paragraphs short and concrete.",
     "Avoid generic AI phrasing, repeated claims, and filler transitions.",
-    "Use the primary keyword naturally and support it with semantically related terms.",
+    "Use the primary keyword naturally and support it with semantically related terms from the full keyword cluster.",
     "Apply brand guidelines exactly when they are present. If a brand guideline conflicts with a generic best practice, follow the brand guideline.",
     "Stay under 1200 words for the main article body.",
     "Use a consistent visual system for the 3 image prompts: same style, palette, lighting, and level of realism.",
     "Return exactly 3 image prompts.",
     "Return 3 to 5 internal link suggestions tied to the available site URLs and existing blog coverage.",
     "Each internal link suggestion must include anchorText, targetUrl, placement, and rationale.",
+    "Generate SEO meta keywords as a 5 to 10 item set that includes the primary keyword and supporting variants from the cluster.",
     "Respond using the provided JSON schema.",
     "",
     params.manualTopicMode
@@ -469,6 +481,8 @@ function formatBlogStructurePrompt(params: {
     `Brand analysis:\n${JSON.stringify(params.analysis, null, 2)}`,
     "",
     `Approved topic:\n${JSON.stringify(params.topic, null, 2)}`,
+    "",
+    `Keyword cluster:\nPrimary keyword: ${keywordCluster.primaryKeyword}\nSupporting keywords: ${keywordCluster.supportingKeywords.join(", ")}`,
     "",
     `Existing site content and link targets:\n${params.internalLinkHints}`,
     "",
@@ -656,6 +670,7 @@ async function generateValidatedTopicSet(
         : `Suggest exactly ${missing} replacement topics to fill the remaining slots.`,
       "Do not rewrite existing articles with only new wording.",
       "Each topic must target a distinct intent, keyword cluster, or content angle.",
+      "Each topic must include a primary keyword plus 4 to 8 supporting keyword variants.",
       "Avoid topics that are semantically similar to any existing article or any previously accepted topic in this run.",
       "If a topic is already covered by live SERP results or existing site content, rewrite it into a meaningfully different angle instead of paraphrasing.",
       "Treat sitemap URLs as existing content coverage even when no page snapshot is available.",
@@ -663,7 +678,10 @@ async function generateValidatedTopicSet(
       "",
       `Existing coverage:\n${coverageBlock}`,
       "",
-      `Already accepted topics:\n${acceptedTopics.length ? acceptedTopics.map((topic, index) => `${index + 1}. ${topic.title} | ${topic.primaryKeyword}`).join("\n") : "None yet."}`,
+      `Already accepted topics:\n${acceptedTopics.length ? acceptedTopics.map((topic, index) => {
+        const keywordCluster = formatTopicKeywordCluster(topic);
+        return `${index + 1}. ${topic.title} | ${keywordCluster.primaryKeyword} | ${keywordCluster.supportingKeywords.join(", ")}`;
+      }).join("\n") : "None yet."}`,
       "",
       `Brand analysis:\n${JSON.stringify(run.analysis.analysis, null, 2)}`,
       "",
@@ -703,8 +721,8 @@ async function generateValidatedTopicSet(
         sourceTitle: topic.title,
         title: topic.title,
         primaryKeyword: topic.primaryKeyword,
-        summary: topic.searchIntent,
-        keywords: [topic.title, topic.primaryKeyword, topic.searchIntent, topic.seoAngle]
+        keywords: [topic.title, topic.primaryKeyword, ...topic.supportingKeywords, topic.searchIntent, topic.seoAngle],
+        summary: topic.searchIntent
       }))
     );
   }
@@ -754,7 +772,7 @@ async function normalizeManualTopicSuggestion(params: {
   const topicPrompt = [
     "Analyze the user's exact topic for SEO planning.",
     "Preserve the topic title exactly as written. Do not rename, rephrase, or rewrite it.",
-    "Return keyword analysis, search intent, ranking rationale, SEO angle, and a practical outline.",
+    "Return keyword analysis, primary keyword, 4 to 8 supporting keyword variants, search intent, ranking rationale, SEO angle, and a practical outline.",
     "",
     `Exact topic title: ${params.manualTopic}`,
     "",
@@ -782,6 +800,7 @@ async function normalizeManualTopicSuggestion(params: {
   const proposedTopic = {
     title: params.manualTopic,
     primaryKeyword: topicDetails.primaryKeyword,
+    supportingKeywords: topicDetails.supportingKeywords,
     searchIntent: topicDetails.searchIntent,
     rankingRationale: topicDetails.rankingRationale,
     seoAngle: topicDetails.seoAngle,
@@ -909,11 +928,17 @@ export async function POST(request: Request) {
       }
 
       const selectedTopic = payload.selectedTopic
-        ? payload.selectedTopic
+        ? {
+            ...payload.selectedTopic,
+            ...formatTopicKeywordCluster(payload.selectedTopic)
+          }
         : await normalizeManualTopicSuggestion({
             run,
             manualTopic: payload.manualTopic?.trim() ?? ""
-          }).then((result) => result.approvedTopic);
+          }).then((result) => ({
+            ...result.approvedTopic,
+            ...formatTopicKeywordCluster(result.approvedTopic)
+          }));
 
       await setProgress(runId, "generate-blog", 10, "Assembling blog prompt");
       const homepageText = `URL: ${run.research.homepage.url}\nTitle: ${run.research.homepage.title}\nExcerpt: ${run.research.homepage.excerpt}\nContent:\n${run.research.homepage.content}`;
@@ -1411,6 +1436,7 @@ export async function POST(request: Request) {
         topic: run.approvedTopic?.approvedTopic ?? {
           title: run.blog.blog.title,
           primaryKeyword: run.blog.blog.meta.keywords[0] ?? run.blog.blog.title,
+          supportingKeywords: run.blog.blog.meta.keywords.slice(1, 6),
           searchIntent: "Approval flow",
           rankingRationale: "Approved article from the current run.",
           seoAngle: "Article review",

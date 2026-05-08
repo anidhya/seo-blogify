@@ -25,6 +25,7 @@ const topicSuggestionSchema = z.object({
       z.object({
         title: z.string(),
         primaryKeyword: z.string(),
+        supportingKeywords: z.array(z.string()).min(4).max(8),
         searchIntent: z.string(),
         rankingRationale: z.string(),
         seoAngle: z.string(),
@@ -36,6 +37,7 @@ const topicSuggestionSchema = z.object({
 
 const manualTopicDetailsSchema = z.object({
   primaryKeyword: z.string(),
+  supportingKeywords: z.array(z.string()).min(4).max(8),
   searchIntent: z.string(),
   rankingRationale: z.string(),
   seoAngle: z.string(),
@@ -59,7 +61,7 @@ const generatedBlogSchema = z.object({
   meta: z.object({
     title: z.string(),
     description: z.string(),
-    keywords: z.array(z.string()).min(4).max(10)
+    keywords: z.array(z.string()).min(5).max(10)
   }),
   faqs: z
     .array(
@@ -255,7 +257,7 @@ export async function generateTopicSuggestions(
       {
         role: "developer",
         content:
-          "You are an SEO strategist. Suggest topics that can realistically rank, align to search intent, and fit the brand voice. Use declarative headline-style titles, not questions. Avoid question marks and avoid titles that begin with question words like what, why, how, when, where, who, which, can, should, do, does, is, are, will, would, or could."
+          "You are an SEO strategist. Suggest topics that can realistically rank, align to search intent, and fit the brand voice. Use declarative headline-style titles, not questions. Avoid question marks and avoid titles that begin with question words like what, why, how, when, where, who, which, can, should, do, does, is, are, will, would, or could. Return a primary keyword and 4 to 8 supporting keyword variants for every topic."
       },
       {
         role: "user",
@@ -290,7 +292,7 @@ export async function generateManualTopicDetails(prompt: string, options?: { web
       {
         role: "developer",
         content:
-          "You are an SEO strategist. Analyze the user's exact topic without renaming or rewriting it. Return only the keyword, search intent, ranking rationale, SEO angle, and outline that support the exact topic title."
+          "You are an SEO strategist. Analyze the user's exact topic without renaming or rewriting it. Return the primary keyword, 4 to 8 supporting keyword variants, search intent, ranking rationale, SEO angle, and outline that support the exact topic title."
       },
       {
         role: "user",
@@ -320,7 +322,7 @@ export async function generateApprovedBlog(prompt: string) {
       {
         role: "developer",
         content:
-          "You are a senior content marketer. Write original, search-optimized blogs that match the provided brand style exactly."
+          "You are a senior content marketer. Write original, search-optimized blogs that match the provided brand style exactly. Optimize for the full keyword cluster, not a single phrase."
       },
       {
         role: "user",

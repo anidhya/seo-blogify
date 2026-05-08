@@ -1,4 +1,5 @@
 import type { ExistingTopic, PageSnapshot, TopicSuggestion, TopicValidationRejected } from "@/lib/types";
+import { formatTopicKeywordCluster } from "@/lib/keyword-clusters";
 
 const STOPWORDS = new Set([
   "a",
@@ -91,7 +92,13 @@ export function rewriteQuestionStyleTopicTitle(topic: TopicSuggestion) {
 }
 
 export function normalizeTopicSuggestions(topics: TopicSuggestion[]) {
-  return topics.map((topic) => rewriteQuestionStyleTopicTitle(topic));
+  return topics.map((topic) => {
+    const rewritten = rewriteQuestionStyleTopicTitle(topic);
+    return {
+      ...rewritten,
+      ...formatTopicKeywordCluster(rewritten)
+    };
+  });
 }
 
 function stem(value: string) {
@@ -210,7 +217,7 @@ function scoreComparison(candidate: TopicSuggestion, existing: ExistingTopic) {
   const candidateTitleTokens = meaningfulTokens(candidate.title);
   const existingTitleTokens = meaningfulTokens(existing.title);
   const candidateIntentTokens = meaningfulTokens(
-    `${candidate.searchIntent} ${candidate.seoAngle} ${candidate.rankingRationale} ${candidate.outline.join(" ")}`
+    `${candidate.searchIntent} ${candidate.seoAngle} ${candidate.rankingRationale} ${candidate.outline.join(" ")} ${candidate.supportingKeywords.join(" ")}`
   );
   const existingTokens = meaningfulTokens(
     `${existing.title} ${existing.primaryKeyword} ${existing.summary} ${existing.keywords.join(" ")}`

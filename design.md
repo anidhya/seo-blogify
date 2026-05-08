@@ -197,7 +197,7 @@ Avoid stacked card shadows and heavy drop shadows.
 - The topic queue should feel like an approval board.
 - Add a compact manual topic composer at the top of the queue when the page supports direct article generation. Keep it to one input, one CTA, and inline validation/status text.
 - Use a strong title, a short subtitle, and one action for topic generation.
-- Topic cards should expose the rationale, keyword, intent, and SEO angle.
+- Topic cards should expose the rationale, keyword cluster, intent, and SEO angle.
 - Approval is a single high-confidence action per card.
 - Keep the approved articles summary short and informational.
 
@@ -205,6 +205,7 @@ Avoid stacked card shadows and heavy drop shadows.
 
 - Present approved articles as a grid of compact cards.
 - Show article title, summary, approval status, topic, quality, feedback count, and LinkedIn status.
+- Surface the article's keyword cluster in the preview and card surfaces so the SEO target stays visible without opening metadata.
 - Provide direct links to preview and LinkedIn workflow.
 - Keep the empty state simple and action-oriented.
 
