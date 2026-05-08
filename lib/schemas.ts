@@ -91,6 +91,7 @@ export const brandAnalysisSchema = z.object({
 export const topicSuggestionSchema = z.object({
   title: z.string(),
   primaryKeyword: z.string(),
+  supportingKeywords: z.union([z.array(z.string()).min(4).max(8), z.array(z.string()).length(0)]).optional().default([]),
   searchIntent: z.string(),
   rankingRationale: z.string(),
   seoAngle: z.string(),

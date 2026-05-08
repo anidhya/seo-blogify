@@ -35,6 +35,7 @@ import {
   workflowInputSchema,
   runBrandGuidelinesSchema
 } from "@/lib/schemas";
+import { ensureTopicKeywordCluster } from "@/lib/keyword-clusters";
 import type {
   BrandAnalysis,
   BrandGuidelineFile,
@@ -1178,7 +1179,10 @@ async function upsertApprovedArticle(
       articleSlug: article.articleSlug,
       createdAt: article.createdAt ?? timestamp,
       updatedAt: article.updatedAt ?? timestamp,
-      topic: article.topic,
+      topic: {
+        ...article.topic,
+        ...ensureTopicKeywordCluster(article.topic)
+      },
       blog: article.blog,
       quality: article.quality,
       wordCount: article.wordCount,
@@ -1325,7 +1329,7 @@ export async function saveTopics(runId: string, topics: TopicSuggestion[]) {
     schemaVersion: SCHEMA_VERSION,
     createdAt: timestamp,
     updatedAt: timestamp,
-    topics: topicListSchema.parse(topics)
+    topics: topicListSchema.parse(topics.map((topic) => ({ ...topic, ...ensureTopicKeywordCluster(topic) })))
   };
 
   await upsertRunArtifactToDb(runId, RUN_TOPICS_ARTIFACT_TYPE, record);
@@ -1339,7 +1343,7 @@ export async function saveTopicCandidates(runId: string, topics: TopicSuggestion
     schemaVersion: SCHEMA_VERSION,
     createdAt: timestamp,
     updatedAt: timestamp,
-    topics: topicListSchema.parse(topics)
+    topics: topicListSchema.parse(topics.map((topic) => ({ ...topic, ...ensureTopicKeywordCluster(topic) })))
   };
 
   await upsertRunArtifactToDb(runId, RUN_TOPIC_CANDIDATES_ARTIFACT_TYPE, record);
@@ -1385,7 +1389,10 @@ export async function saveApprovedTopic(runId: string, approvedTopic: TopicSugge
     schemaVersion: SCHEMA_VERSION,
     createdAt: timestamp,
     updatedAt: timestamp,
-    approvedTopic: topicSuggestionSchema.parse(approvedTopic)
+    approvedTopic: topicSuggestionSchema.parse({
+      ...approvedTopic,
+      ...ensureTopicKeywordCluster(approvedTopic)
+    })
   };
 
   await upsertRunArtifactToDb(runId, RUN_APPROVED_TOPIC_ARTIFACT_TYPE, record);

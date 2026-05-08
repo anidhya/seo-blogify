@@ -6,6 +6,7 @@ import type { RunBundle } from "@/lib/storage";
 import type { BlogQuality, GeneratedBlog, TopicSuggestion } from "@/lib/types";
 import WorkflowProgressBar from "@/app/components/workflow-progress";
 import Link from "next/link";
+import { formatTopicKeywordCluster } from "@/lib/keyword-clusters";
 
 type WorkflowResponse =
   | { runId: string; topics: TopicSuggestion[] }
@@ -258,38 +259,54 @@ export default function TopicsClient({ runId, run }: Props) {
         <div className="surface-shell p-4 text-sm text-zinc-400">No topics have been generated for this run yet.</div>
       ) : (
         <div className="grid gap-3">
-          {topics.map((topic) => (
-            <article
-              className="group rounded-[12px] border border-white/8 bg-white/5 p-4 shadow-[0_8px_18px_rgba(0,0,0,0.12)] transition duration-200 hover:-translate-y-1 hover:border-[#0f7b49]/30 hover:bg-white/7 hover:shadow-[0_12px_24px_rgba(15,123,73,0.1)]"
-              key={topic.title}
-            >
-              <div className="flex items-start justify-between gap-4 max-md:flex-col">
-                <div className="min-w-0">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#0f7b49] dark:text-[#86efac]">
-                    Suggested topic
-                  </div>
-                  <h3 className="mt-3 text-base font-semibold text-zinc-50">{topic.title}</h3>
-                  <p className="mt-1 text-sm leading-6 text-zinc-400">{topic.rankingRationale}</p>
-                </div>
-                <button
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 text-[#0f7b49] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/20 disabled:cursor-progress disabled:opacity-60 dark:text-[#86efac]"
-                  type="button"
-                  disabled={isPending || Boolean(activeAction)}
-                  onClick={() => generateBlog(topic)}
-                  aria-label={`Approve ${topic.title}`}
-                  title={`Approve ${topic.title}`}
-                >
-                  ✓
-                </button>
-              </div>
+          {topics.map((topic) => {
+            const keywordCluster = formatTopicKeywordCluster(topic);
 
-              <div className="mt-4 flex flex-wrap gap-2 text-sm text-zinc-400">
-                <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">Keyword: {topic.primaryKeyword}</span>
-                <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">Intent: {topic.searchIntent}</span>
-                <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">SEO angle: {topic.seoAngle}</span>
-              </div>
-            </article>
-          ))}
+            return (
+              <article
+                className="group rounded-[12px] border border-white/8 bg-white/5 p-4 shadow-[0_8px_18px_rgba(0,0,0,0.12)] transition duration-200 hover:-translate-y-1 hover:border-[#0f7b49]/30 hover:bg-white/7 hover:shadow-[0_12px_24px_rgba(15,123,73,0.1)]"
+                key={topic.title}
+              >
+                <div className="flex items-start justify-between gap-4 max-md:flex-col">
+                  <div className="min-w-0">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#0f7b49] dark:text-[#86efac]">
+                      Suggested topic
+                    </div>
+                    <h3 className="mt-3 text-base font-semibold text-zinc-50">{topic.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-zinc-400">{topic.rankingRationale}</p>
+                  </div>
+                  <button
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 text-[#0f7b49] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/20 disabled:cursor-progress disabled:opacity-60 dark:text-[#86efac]"
+                    type="button"
+                    disabled={isPending || Boolean(activeAction)}
+                    onClick={() => generateBlog(topic)}
+                    aria-label={`Approve ${topic.title}`}
+                    title={`Approve ${topic.title}`}
+                  >
+                    ✓
+                  </button>
+                </div>
+
+                <div className="mt-4 grid gap-2 text-sm text-zinc-400">
+                  <div className="flex flex-wrap gap-2">
+                    <span className="rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-3 py-1 text-[#86efac]">
+                      Primary: {keywordCluster.primaryKeyword}
+                    </span>
+                    <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">Intent: {topic.searchIntent}</span>
+                    <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">SEO angle: {topic.seoAngle}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">Supporting keywords</span>
+                    {keywordCluster.supportingKeywords.map((keyword) => (
+                      <span key={keyword} className="rounded-full border border-white/8 bg-white/5 px-3 py-1">
+                        {keyword}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
 

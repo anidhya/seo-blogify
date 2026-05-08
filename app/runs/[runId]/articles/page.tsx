@@ -2,6 +2,7 @@ import Link from "next/link";
 import { loadRun } from "@/lib/storage";
 import { notFound } from "next/navigation";
 import WorkspaceShell from "@/app/components/workspace-shell";
+import { formatTopicKeywordCluster } from "@/lib/keyword-clusters";
 
 export const dynamic = "force-dynamic";
 
@@ -62,45 +63,64 @@ export default async function ArticlesPage({ params }: PageProps) {
           <div className="surface-shell p-6 text-sm text-zinc-600 dark:text-zinc-300">No approved articles yet.</div>
         ) : (
           <div className="grid gap-3 xl:grid-cols-2">
-            {articles.map((article) => (
-              <article key={article.articleSlug} className="rounded-[12px] border border-black/10 bg-white/95 p-4 shadow-[0_8px_18px_rgba(15,23,42,0.04)] dark:border-white/8 dark:bg-white/5">
-                <div className="flex items-start justify-between gap-4 max-md:flex-col">
-                  <div className="min-w-0">
-                    <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{article.blog.title}</h2>
-                    <p className="mt-1 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{article.blog.summary}</p>
+            {articles.map((article) => {
+              const keywordCluster = formatTopicKeywordCluster(article.topic);
+
+              return (
+                <article key={article.articleSlug} className="rounded-[12px] border border-black/10 bg-white/95 p-4 shadow-[0_8px_18px_rgba(15,23,42,0.04)] dark:border-white/8 dark:bg-white/5">
+                  <div className="flex items-start justify-between gap-4 max-md:flex-col">
+                    <div className="min-w-0">
+                      <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{article.blog.title}</h2>
+                      <p className="mt-1 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{article.blog.summary}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-[#0f7b49]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0f7b49] dark:text-[#86efac]">
+                      {article.approvalStatus}
+                    </span>
                   </div>
-                  <span className="shrink-0 rounded-full bg-[#0f7b49]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0f7b49] dark:text-[#86efac]">
-                    {article.approvalStatus}
-                  </span>
-                </div>
 
-                <div className="mt-4 flex flex-wrap gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-                  <span>Topic: {article.topic.title}</span>
-                  <span>Quality: {article.quality.score}%</span>
-                  <span>Feedback: {article.feedbackCount}</span>
-                  <span>
-                    LinkedIn:{" "}
-                    {run.linkedin?.articles.find((item) => item.articleSlug === article.articleSlug)?.draft?.reviewStatus ??
-                      "pending"}
-                  </span>
-                </div>
+                  <div className="mt-4 grid gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+                    <div className="flex flex-wrap gap-2">
+                      <span>Topic: {article.topic.title}</span>
+                      <span>Quality: {article.quality.score}%</span>
+                      <span>Feedback: {article.feedbackCount}</span>
+                      <span>
+                        LinkedIn:{" "}
+                        {run.linkedin?.articles.find((item) => item.articleSlug === article.articleSlug)?.draft?.reviewStatus ??
+                          "pending"}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-3 py-1 text-[#0f7b49] dark:text-[#86efac]">
+                        Primary: {keywordCluster.primaryKeyword}
+                      </span>
+                      {keywordCluster.supportingKeywords.map((keyword) => (
+                        <span
+                          key={keyword}
+                          className="rounded-full border border-black/10 bg-white px-3 py-1 text-zinc-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200"
+                        >
+                          {keyword}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Link
-                    className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white px-4 py-2 text-sm font-medium text-zinc-900 transition hover:-translate-y-0.5 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:hover:bg-white/10"
-                    href={`/runs/${runId}/blog/${article.articleSlug}`}
-                  >
-                    Open preview
-                  </Link>
-                  <Link
-                    className="inline-flex items-center justify-center rounded-xl border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:text-[#86efac]"
-                    href={`/runs/${runId}/blog/${article.articleSlug}/linkedin`}
-                  >
-                    LinkedIn
-                  </Link>
-                </div>
-              </article>
-            ))}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Link
+                      className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white px-4 py-2 text-sm font-medium text-zinc-900 transition hover:-translate-y-0.5 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:hover:bg-white/10"
+                      href={`/runs/${runId}/blog/${article.articleSlug}`}
+                    >
+                      Open preview
+                    </Link>
+                    <Link
+                      className="inline-flex items-center justify-center rounded-xl border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-4 py-2 text-sm font-medium text-[#0f7b49] transition hover:-translate-y-0.5 hover:bg-[#0f7b49]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f7b49]/25 dark:text-[#86efac]"
+                      href={`/runs/${runId}/blog/${article.articleSlug}/linkedin`}
+                    >
+                      LinkedIn
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </section>

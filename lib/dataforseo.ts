@@ -251,7 +251,7 @@ function scoreTopicOverlap(
 ) {
   const candidateTitle = normalizeText(topic.title);
   const candidateKeyword = normalizeText(topic.primaryKeyword);
-  const candidateTokens = tokenizeText(`${topic.title} ${topic.primaryKeyword}`);
+  const candidateTokens = tokenizeText(`${topic.title} ${topic.primaryKeyword} ${topic.supportingKeywords.join(" ")}`);
   const normalizedSiteDomain = normalizeDomain(siteDomain);
 
   let bestMatch: { title: string; score: number; domainMatch: boolean; similarTerms: string[] } | null = null;
@@ -354,7 +354,7 @@ export async function reviewTopicCandidatesAgainstSerp(params: {
 
   for (const topic of params.candidates) {
     try {
-      const organic = await lookupTopicSerp(topic.primaryKeyword || topic.title);
+      const organic = await lookupTopicSerp(topic.primaryKeyword || topic.supportingKeywords[0] || topic.title);
       const overlap = scoreTopicOverlap(topic, organic, params.existingTopics, params.siteDomain);
 
       if (overlap.duplicate) {

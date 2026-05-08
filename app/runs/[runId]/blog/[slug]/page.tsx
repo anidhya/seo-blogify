@@ -6,6 +6,7 @@ import CopyButton from "./copy-button";
 import EditableArticleCard from "./editable-article-card";
 import SocialHandoffButton from "./social-handoff-button";
 import WorkspaceShell from "@/app/components/workspace-shell";
+import { formatTopicKeywordCluster } from "@/lib/keyword-clusters";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,18 @@ export default async function BlogPreviewPage({ params }: PageProps) {
 
   const approvedArticle = run.approvedArticles?.articles.find((article) => article.articleSlug === slug) ?? null;
   const blog = approvedArticle?.blog ?? (run.blog?.blog?.slug === slug ? run.blog.blog : null);
+  const topic = formatTopicKeywordCluster(
+    approvedArticle?.topic ??
+      run.approvedTopic?.approvedTopic ?? {
+        title: blog?.title ?? slug,
+        primaryKeyword: blog?.meta.keywords[0] ?? blog?.title ?? slug,
+        supportingKeywords: blog?.meta.keywords.slice(1, 6) ?? [],
+        searchIntent: "Article preview",
+        rankingRationale: "Derived from the current article.",
+        seoAngle: "Editorial review",
+        outline: []
+      }
+  );
 
   if (!blog) {
     notFound();
@@ -151,6 +164,24 @@ export default async function BlogPreviewPage({ params }: PageProps) {
               </div>
               <h1 className="mt-3 font-display text-3xl tracking-[-0.04em] text-neutral-900 md:text-4xl dark:text-zinc-50">{blog.title}</h1>
               <p className="mt-2 text-sm leading-6 text-neutral-600 md:text-[15px] dark:text-zinc-400">{blog.summary}</p>
+              <div className="mt-4 grid gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500 dark:text-zinc-400">
+                  Keyword cluster
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded-full border border-[#0f7b49]/20 bg-[#0f7b49]/10 px-3 py-1 text-xs font-medium text-[#0f7b49] dark:text-[#86efac]">
+                    Primary: {topic.primaryKeyword}
+                  </span>
+                  {topic.supportingKeywords.map((keyword) => (
+                    <span
+                      key={keyword}
+                      className="rounded-full border border-black/10 bg-white/80 px-3 py-1 text-xs font-medium text-neutral-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200"
+                    >
+                      {keyword}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
             <div className="grid gap-2 text-xs text-neutral-500 dark:text-zinc-400">
               <div className="flex flex-wrap gap-2">
