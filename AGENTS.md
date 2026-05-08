@@ -20,6 +20,10 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 - Lint: `npm run lint`
 - Typecheck: `npm run typecheck`
 - Production build: `npm run build`
+- Apply Postgres migrations: `npm run db:migrate`
+- Backfill file-store data into Postgres: `npm run db:backfill`
+- Repair migrated storage rows: `npm run db:repair`
+- Verify migration coverage: `npm run db:verify`
 
 ## Where Things Live
 
@@ -32,6 +36,7 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 - Route-specific components: near the route they support
 - Business logic and utilities: `lib/`
 - Reusable workflow skills: `skills/seo-friendly-topics/`, `skills/seo-friendly-articles/`, `skills/dataforseo-seo-research/`
+- Database migration, backfill, repair, verification, and brand-guideline parsing helpers: `scripts/`
 - Design guidance: `design.md`
 - Product summary and setup notes: `README.md`
 
