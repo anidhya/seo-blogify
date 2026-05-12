@@ -153,11 +153,18 @@ Avoid stacked card shadows and heavy drop shadows.
 
 - Center the hero vertically and keep it concise.
 - Use a small brand badge above the headline.
-- The main card should contain the website URL field first.
+- The main card should show company name before website URL so the saved workspace has a clear label from the start.
 - Advanced fields should be hidden behind a progressive disclosure toggle.
 - Show analysis progress directly under the form.
 - Keep the primary CTA large, navy, and text-first.
 - Add a secondary social-content path so the root page works as a gateway between blog and social workflows.
+
+### Authentication
+
+- Use a split login surface with a strong Google OAuth button and a compact magic-link form.
+- Keep the Google sign-in button clearly blue so the OAuth path reads as an external identity flow.
+- Keep magic-link copy short and utilitarian; the form should feel like a fast fallback, not a separate product.
+- If the user is already authenticated, route them straight into the workspace instead of showing the login page.
 
 ### Social Studio
 

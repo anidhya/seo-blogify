@@ -1018,6 +1018,43 @@ function getDomainFromWebsiteUrl(websiteUrl?: string | null) {
   }
 }
 
+function getBrandNameFromAnalysisSummary(summary?: string | null) {
+  if (!summary) {
+    return null;
+  }
+
+  const trimmed = summary.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const markers = [" appears to be ", " is an ", " is a ", " is the ", " is ", " – ", " — ", " - ", " | "];
+  for (const marker of markers) {
+    const index = trimmed.indexOf(marker);
+    if (index > 0) {
+      const candidate = trimmed.slice(0, index).trim();
+      if (candidate) {
+        return candidate;
+      }
+    }
+  }
+
+  return null;
+}
+
+function resolveBrandName(params: {
+  companyName?: string | null;
+  websiteUrl?: string | null;
+  analysisSummary?: string | null;
+}) {
+  return (
+    params.companyName?.trim() ||
+    getBrandNameFromAnalysisSummary(params.analysisSummary) ||
+    getDomainFromWebsiteUrl(params.websiteUrl) ||
+    "Untitled brand"
+  );
+}
+
 export async function loadLatestBrandGuidelines(domain: string) {
   const dbRecord = await loadLatestBrandGuidelinesFromDb(domain);
   return dbRecord;
@@ -1909,7 +1946,13 @@ export async function loadRun(runId: string): Promise<RunBundle> {
   }
 
   const [runRows, artifacts, brandGuidelines] = await Promise.all([
-    db`select * from runs where id = ${runId} limit 1`,
+    db`
+      select r.*, b.name as brand_name, b.domain as brand_domain
+      from runs r
+      left join brands b on b.id = r.brand_id
+      where r.id = ${runId}
+      limit 1
+    `,
     loadRunArtifactsFromDb(runId),
     loadRunBrandGuidelinesFromDb(runId)
   ]);
@@ -1977,10 +2020,20 @@ export async function loadRun(runId: string): Promise<RunBundle> {
     artifacts?.get(RUN_REGENERATION_NOTES_ARTIFACT_TYPE)
   );
   const linkedin = normalizeArtifactRecord<RunLinkedInArticlesRecord>(artifacts?.get(RUN_LINKEDIN_ARTIFACT_TYPE));
+  const resolvedCompanyName = resolveBrandName({
+    companyName: input?.companyName || (runRow as { brand_name?: string | null }).brand_name || null,
+    websiteUrl: input?.websiteUrl || null,
+    analysisSummary: analysis?.analysis?.companySummary
+  });
 
   return {
     manifest,
-    input,
+    input: input
+      ? {
+          ...input,
+          companyName: resolvedCompanyName
+        }
+      : null,
     research,
     existingTopics,
     analysis,
@@ -2104,8 +2157,10 @@ export async function listRunSummaries(): Promise<RunSummary[]> {
     const rows = await db`
       select
         r.id as "runId",
-        coalesce((r.input->>'companyName'), 'Untitled brand') as "companyName",
+        b.name as "brandName",
+        coalesce((r.input->>'companyName'), '') as "companyName",
         coalesce((r.input->>'websiteUrl'), '') as "websiteUrl",
+        (select (ra.payload->'analysis'->>'companySummary') from run_artifacts ra where ra.run_id = r.id and ra.artifact_type = ${RUN_ANALYSIS_ARTIFACT_TYPE} limit 1) as "analysisCompanySummary",
         r.updated_at as "updatedAt",
         r.status as "status",
         exists (
@@ -2127,12 +2182,17 @@ export async function listRunSummaries(): Promise<RunSummary[]> {
             and ra.artifact_type = ${RUN_BRAND_GUIDELINES_ARTIFACT_TYPE}
         ) as "hasBrandGuidelines"
       from runs r
+      left join brands b on b.id = r.brand_id
       order by r.updated_at desc
     `;
 
     return rows.map((row) => ({
       runId: row.runId,
-      companyName: row.companyName,
+      companyName: resolveBrandName({
+        companyName: row.brandName || row.companyName,
+        websiteUrl: row.websiteUrl,
+        analysisSummary: row.analysisCompanySummary
+      }),
       websiteUrl: row.websiteUrl,
       updatedAt: row.updatedAt,
       status: row.status,
@@ -2155,7 +2215,7 @@ export async function listRunSummaries(): Promise<RunSummary[]> {
       const runId = run.manifest?.runId ?? run.input?.runId ?? "";
       return {
         runId,
-        companyName: run.input?.companyName || "Untitled brand",
+        companyName: run.input?.companyName || getDomainFromWebsiteUrl(run.input?.websiteUrl) || "Untitled brand",
         websiteUrl: run.input?.websiteUrl || "",
         updatedAt: run.manifest?.updatedAt || run.input?.updatedAt || "",
         status: run.manifest?.status || "created",

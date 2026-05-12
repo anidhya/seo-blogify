@@ -16,6 +16,20 @@ function getDomain(url: string) {
   catch { return url || "Unknown"; }
 }
 
+function getGroupLabel(profile: RunSummary) {
+  return profile.companyName?.trim() || getDomain(profile.websiteUrl) || "Unknown";
+}
+
+function getGroupKey(profile: RunSummary) {
+  const companyName = profile.companyName?.trim();
+  if (companyName) {
+    return `company:${companyName.toLowerCase()}`;
+  }
+
+  const domain = getDomain(profile.websiteUrl);
+  return `domain:${domain.toLowerCase()}`;
+}
+
 function timeAgo(dateStr?: string) {
   if (!dateStr) return "—";
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -74,14 +88,16 @@ export default function ProfilesPage() {
     }
   }
 
-  // Group profiles by domain
-  const groups: Record<string, RunSummary[]> = {};
+  // Group profiles by the most useful label available.
+  const groups: Record<string, { label: string; runs: RunSummary[] }> = {};
   for (const p of profiles) {
-    const domain = getDomain(p.websiteUrl);
-    if (!groups[domain]) groups[domain] = [];
-    groups[domain].push(p);
+    const key = getGroupKey(p);
+    if (!groups[key]) {
+      groups[key] = { label: getGroupLabel(p), runs: [] };
+    }
+    groups[key].runs.push(p);
   }
-  const sortedDomains = Object.keys(groups).sort();
+  const sortedGroups = Object.values(groups).sort((a, b) => a.label.localeCompare(b.label));
 
   const totalReady = profiles.filter((p) => p.publishStatus === "publish_ready").length;
 
@@ -100,7 +116,7 @@ export default function ProfilesPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">Dashboard</h1>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">All your brand projects, grouped by website.</p>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">All your brand projects, grouped by company name or website.</p>
           </div>
           <div className="flex items-center gap-3">
             {!loading && (
@@ -170,20 +186,23 @@ export default function ProfilesPage() {
         )}
 
         {/* Grouped profiles */}
-        {!loading && sortedDomains.length > 0 && (
+        {!loading && sortedGroups.length > 0 && (
           <div className="grid gap-8">
-            {sortedDomains.map((domain) => {
-              const runs = groups[domain];
+            {sortedGroups.map(({ label, runs }) => {
               const domainReady = runs.filter((r) => r.publishStatus === "publish_ready").length;
+              const domain = getDomain(runs[0]?.websiteUrl || "");
               return (
-                <div key={domain}>
+                <div key={label}>
                   {/* Domain header */}
                   <div className="mb-3 flex items-center gap-3">
                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-200 text-xs font-bold text-zinc-500 dark:bg-white/10 dark:text-zinc-400">
-                      {domain.slice(0, 1).toUpperCase()}
+                      {label.slice(0, 1).toUpperCase()}
                     </div>
                     <div className="flex flex-1 items-center gap-2">
-                      <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{domain}</h2>
+                      <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{label}</h2>
+                      {domain && domain.toLowerCase() !== label.toLowerCase() && (
+                        <span className="text-xs text-zinc-400">{domain}</span>
+                      )}
                       <span className="text-xs text-zinc-400">{runs.length} run{runs.length !== 1 ? "s" : ""}</span>
                       {domainReady > 0 && (
                         <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
@@ -223,6 +242,8 @@ export default function ProfilesPage() {
                             )}
                           </div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+                            <span>{profile.websiteUrl ? getDomain(profile.websiteUrl) : "No website URL"}</span>
+                            <span className="text-zinc-200 dark:text-zinc-700">·</span>
                             <span>{timeAgo(profile.updatedAt)}</span>
                             {profile.qualityScore != null && (
                               <>
