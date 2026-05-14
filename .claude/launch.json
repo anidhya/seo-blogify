@@ -3,9 +3,10 @@
   "configurations": [
     {
       "name": "seo-blogify",
-      "runtimeExecutable": "/bin/sh",
-      "runtimeArgs": ["-c", "PATH=/usr/local/bin:$PATH npm run dev"],
-      "port": 3000
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["--norc", "--noprofile", "-c", "cd /Users/anidhyaahuja/Documents/blogify && exec /Users/anidhyaahuja/.nvm/versions/node/v23.6.1/bin/node /Users/anidhyaahuja/Documents/blogify/node_modules/next/dist/bin/next dev"],
+      "port": 3000,
+      "autoPort": false
     }
   ]
 }

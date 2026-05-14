@@ -476,7 +476,7 @@ export default function RunWorkspaceClient({ runId, run }: Props) {
           </div>
 
           {/* Overview cards — 4 quick editable fields */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             <InfoCard icon="🎯" label="Audience" color="sky">
               <EditableText
                 label="Audience"

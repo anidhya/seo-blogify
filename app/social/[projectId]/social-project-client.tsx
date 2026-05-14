@@ -358,8 +358,8 @@ function PlatformSection({
           className="w-full max-w-6xl overflow-hidden rounded-[28px] bg-white shadow-[0_40px_120px_rgba(15,23,42,0.35)] dark:bg-[#0f1115]"
           onMouseDown={(event) => event.stopPropagation()}
         >
-          <div className="grid min-h-[760px] md:grid-cols-[minmax(0,1.06fr)_minmax(340px,0.94fr)]">
-            <div className={`relative flex min-h-[420px] flex-col overflow-hidden p-6 text-white ${previewTheme}`}>
+          <div className="grid grid-cols-1 md:min-h-[760px] md:grid-cols-[minmax(0,1.06fr)_minmax(340px,0.94fr)]">
+            <div className={`relative flex min-h-[280px] flex-col overflow-hidden p-6 text-white md:min-h-[420px] ${previewTheme}`}>
               <div className="flex items-center justify-between gap-3">
                 <span className="rounded-full bg-black/[0.40] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
                   {editorSlideIndex + 1}/{previewSlides.length}
