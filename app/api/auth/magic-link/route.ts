@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     expiresAt: expiresAt.toISOString()
   });
 
-  const magicLink = getMagicLinkUrl(token, request.url);
+  const magicLink = getMagicLinkUrl(token);
   let sent = false;
   try {
     sent = await sendMagicLinkEmail({ to: email, link: magicLink });
