@@ -281,6 +281,12 @@ export default function WorkspaceShell({ title, subtitle, navItems, children, to
             <Icon icon={themeIcon} />
             <span>{resolvedTheme === "dark" ? "Light mode" : "Dark mode"}</span>
           </button>
+          <a
+            href="/api/auth/logout"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/8 dark:hover:text-zinc-100"
+          >
+            <span>Sign out</span>
+          </a>
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}

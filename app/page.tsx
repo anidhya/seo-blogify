@@ -219,6 +219,12 @@ export default function HomePage() {
             >
               Dashboard
             </Link>
+            <a
+              href="/api/auth/logout"
+              className="rounded-xl border border-black/[0.08] bg-white/80 px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-white hover:text-zinc-900 dark:border-white/[0.08] dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10"
+            >
+              Sign out
+            </a>
             <ThemeToggle />
           </div>
         </header>
@@ -271,6 +277,18 @@ export default function HomePage() {
 
                 <div className="mt-5 grid gap-3">
                   <label className="grid gap-1.5">
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">Company name</span>
+                    <input
+                      type="text"
+                      autoComplete="organization"
+                      placeholder="Acme Inc."
+                      value={form.companyName}
+                      onChange={(e) => update("companyName", e.target.value)}
+                      className="rounded-xl border border-black/10 bg-zinc-50 px-4 py-3.5 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-[#0f7b49]/35 focus:bg-white focus:ring-2 focus:ring-[#0f7b49]/10 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:!bg-[#0f1115] dark:focus:border-[#4ade80]/30 dark:focus:ring-[#4ade80]/15"
+                    />
+                  </label>
+
+                  <label className="grid gap-1.5">
                     <span className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">Website URL</span>
                     <input
                       type="url"
@@ -304,12 +322,6 @@ export default function HomePage() {
                   {showAdvanced ? (
                     <div className="grid gap-3 rounded-[20px] border border-black/[0.06] bg-zinc-50/80 p-4 dark:border-white/[0.08] dark:bg-white/5">
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <input
-                          placeholder="Company name"
-                          value={form.companyName}
-                          onChange={(e) => update("companyName", e.target.value)}
-                          className="rounded-xl border border-black/[0.08] bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-[#0f7b49]/35 focus:ring-1 focus:ring-[#0f7b49]/10 dark:border-white/[0.08] dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
-                        />
                         <input
                           placeholder="Priority keywords"
                           value={form.keywords}
@@ -382,6 +394,10 @@ export default function HomePage() {
                       {error}
                     </p>
                   ) : null}
+
+                  <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+                    Company name is saved with the run and shown on the dashboard, article workspace, and approval screens.
+                  </p>
                 </div>
               </div>
 

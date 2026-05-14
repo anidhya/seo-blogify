@@ -19,12 +19,14 @@ Marketier AI is a Next.js app that turns a company website and supporting blog U
 - generates LinkedIn carousel images with Google AI Studio from the approved carousel prompts and shows them on the LinkedIn page
 - supports LinkedIn OAuth connection, approval, scheduling, and publish-now actions
 - provides a separate Social Studio for URL- or topic-based Instagram, LinkedIn, and X drafts with editing, comments, scheduling, and platform connections
+- supports Google OAuth login and passwordless magic-link signup/sign-in
 - stores workflow data in Postgres through the configured `DATABASE_URL`
 - keeps unreachable homepage and blog URLs as explicit unavailable snapshots so research never stops at a dead end
 
 ## Main screens
 
 - `/` landing page with the sync form and quick workflow actions
+- `/login` authentication entry point for Google OAuth and magic-link sign-in
 - `/social` social-content studio landing page and project library
 - `/social/[projectId]` social content workspace with per-platform editing, comments, and scheduling
 - `/profiles` synced brand and workspace profile list
@@ -79,6 +81,10 @@ Important variables:
 - `OPENAI_MODEL` defaults to `gpt-5.4-mini`
 - `OPENAI_EMBEDDING_MODEL` defaults to `text-embedding-3-small`
 - `OPENAI_ENABLE_WEB_SEARCH` can be set to `false` to disable web search for topic generation
+- `AUTH_SECRET` signs session cookies and OAuth state
+- `APP_URL` sets the canonical public base URL for auth links and redirects
+- `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `GOOGLE_OAUTH_REDIRECT_URI` enable Google OAuth sign-in
+- `RESEND_API_KEY` and `RESEND_FROM_EMAIL` enable magic-link email delivery
 - `DATAFORSEO_LOGIN` and `DATAFORSEO_PASSWORD` enable DataForSEO-backed keyword and SERP evidence for topic generation
 - `DATAFORSEO_LOCATION_CODE` defaults to `2840` for United States
 - `DATAFORSEO_LANGUAGE_CODE` defaults to `en`
