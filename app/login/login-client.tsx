@@ -57,7 +57,7 @@ export default function LoginClient({ nextPath, initialError }: Props) {
   return (
     <div className="min-h-screen bg-[#f6f9f6] px-4 py-6 text-zinc-900 dark:bg-[#0f1011] dark:text-zinc-50">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-6xl items-center">
-        <div className="grid w-full gap-6 lg:grid-cols-[1.08fr_0.92fr]">
+        <div className="grid w-full gap-6 grid-cols-1 lg:grid-cols-[1.08fr_0.92fr]">
           <section className="relative overflow-hidden rounded-[28px] border border-black/[0.08] bg-white px-6 py-8 shadow-[0_18px_44px_rgba(15,23,42,0.05)] dark:border-white/[0.08] dark:bg-white/5 sm:px-8 sm:py-10">
             <div className="absolute inset-0 pointer-events-none">
               <div className="absolute -left-20 top-8 h-56 w-56 rounded-full bg-[#0f7b49]/[0.08] blur-3xl dark:bg-[#4ade80]/10" />

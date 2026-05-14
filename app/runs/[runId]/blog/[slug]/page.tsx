@@ -201,7 +201,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
           </div>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
           <div className="grid min-w-0 gap-4">
             <EditableArticleCard
               runId={runId}

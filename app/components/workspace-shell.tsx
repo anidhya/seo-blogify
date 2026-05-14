@@ -20,7 +20,8 @@ type NavIcon =
   | "plus"
   | "settings"
   | "sun"
-  | "moon";
+  | "moon"
+  | "menu";
 
 type NavItem = {
   label: string;
@@ -153,6 +154,12 @@ function Icon({ icon }: { icon: NavIcon }) {
           <path d="M16.2 13.7A7.2 7.2 0 0 1 10.3 5a7.2 7.2 0 1 0 8.7 8.7 7.3 7.3 0 0 1-2.8 0Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
         </svg>
       );
+    case "menu":
+      return (
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className={cls}>
+          <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
   }
 }
 
@@ -171,11 +178,12 @@ function StatusBadge({ status }: { status?: NavItem["status"] }) {
   );
 }
 
-function NavLink({ item, step }: { item: NavItem; step?: number }) {
+function NavLink({ item, step, onNavigate }: { item: NavItem; step?: number; onNavigate?: () => void }) {
   return (
     <a
       href={item.href}
       aria-current={item.active ? "page" : undefined}
+      onClick={onNavigate}
       className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
         item.active
           ? "bg-[#0f7b49]/10 text-[#0f7b49] dark:text-[#4ade80]"
@@ -204,13 +212,25 @@ function NavLink({ item, step }: { item: NavItem; step?: number }) {
 export default function WorkspaceShell({ title, subtitle, navItems, children, topAction, backHref, backLabel = "Back", breadcrumbs }: Props) {
   const { resolvedTheme, toggleTheme, setTheme } = useTheme();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const themeIcon = useMemo(() => (resolvedTheme === "dark" ? "sun" : "moon"), [resolvedTheme]);
+
+  const closeSidebar = () => setSidebarOpen(false);
 
   return (
     <div className="flex min-h-screen bg-[--page-bg] text-zinc-900 dark:text-zinc-50">
 
+      {/* ── Mobile backdrop ── */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          onClick={closeSidebar}
+          aria-hidden="true"
+        />
+      )}
+
       {/* ── Left Sidebar ── */}
-      <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col border-r border-black/8 bg-white dark:border-white/8 dark:bg-[#111]">
+      <aside className={`fixed inset-y-0 left-0 z-40 flex h-screen w-56 shrink-0 flex-col border-r border-black/8 bg-white transition-transform duration-300 dark:border-white/8 dark:bg-[#111] md:sticky md:top-0 md:z-auto ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} ${!sidebarOpen ? "md:hidden" : "md:flex"}`}>
 
         {/* Logo */}
         <div className="flex items-center gap-3 border-b border-black/8 px-4 py-4 dark:border-white/8">
@@ -238,7 +258,6 @@ export default function WorkspaceShell({ title, subtitle, navItems, children, to
 
         {/* Nav items */}
         <nav className="flex flex-1 flex-col overflow-y-auto px-3 pt-3">
-          {/* Split: workflow items (have status) vs main nav items */}
           {(() => {
             const mainItems = navItems.filter((i) => i.status === undefined && !["analysis","topics","articles","preview","linkedin"].includes(i.icon));
             const workflowItems = navItems.filter((i) => i.status !== undefined || ["analysis","topics","articles","preview","linkedin"].includes(i.icon));
@@ -250,7 +269,7 @@ export default function WorkspaceShell({ title, subtitle, navItems, children, to
                     <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Menu</p>
                     <div className="flex flex-col gap-0.5">
                       {mainItems.map((item) => (
-                        <NavLink key={item.href} item={item} />
+                        <NavLink key={item.href} item={item} onNavigate={closeSidebar} />
                       ))}
                     </div>
                   </div>
@@ -261,7 +280,7 @@ export default function WorkspaceShell({ title, subtitle, navItems, children, to
                     <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Workflow</p>
                     <div className="flex flex-col gap-0.5">
                       {workflowItems.map((item, i) => (
-                        <NavLink key={item.href} item={item} step={i + 1} />
+                        <NavLink key={item.href} item={item} step={i + 1} onNavigate={closeSidebar} />
                       ))}
                     </div>
                   </div>
@@ -301,30 +320,38 @@ export default function WorkspaceShell({ title, subtitle, navItems, children, to
       {/* ── Main content ── */}
       <div className="flex min-w-0 flex-1 flex-col">
 
-        {/* Top bar (breadcrumbs / actions) */}
-        {(breadcrumbs?.length || topAction || subtitle) ? (
-          <header className="flex items-center justify-between gap-4 border-b border-black/8 bg-white px-6 py-3 dark:border-white/8 dark:bg-[#111]">
-            <div className="flex min-w-0 items-center gap-2">
-              {breadcrumbs?.length ? (
-                <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-                  {breadcrumbs.map((crumb, i) => (
-                    <span key={`${crumb.label}-${i}`} className="flex items-center gap-1.5">
-                      {i > 0 && <span aria-hidden="true" className="text-zinc-300 dark:text-zinc-600">/</span>}
-                      {crumb.href && !crumb.active ? (
-                        <a href={crumb.href} className="transition hover:text-[#0f7b49] dark:hover:text-[#4ade80]">{crumb.label}</a>
-                      ) : (
-                        <span className={crumb.active ? "font-medium text-zinc-900 dark:text-zinc-100" : ""}>{crumb.label}</span>
-                      )}
-                    </span>
-                  ))}
-                </nav>
-              ) : subtitle ? (
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">{subtitle}</p>
-              ) : null}
-            </div>
-            {topAction && <div className="shrink-0">{topAction}</div>}
-          </header>
-        ) : null}
+        {/* Top bar — always rendered so hamburger is always accessible */}
+        <header className="flex items-center justify-between gap-4 border-b border-black/8 bg-white px-4 py-3 dark:border-white/8 dark:bg-[#111]">
+          <div className="flex min-w-0 items-center gap-2">
+            {/* Hamburger toggle */}
+            <button
+              type="button"
+              onClick={() => setSidebarOpen((o) => !o)}
+              aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+              className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/8 dark:hover:text-zinc-100"
+            >
+              <Icon icon="menu" />
+            </button>
+
+            {breadcrumbs?.length ? (
+              <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+                {breadcrumbs.map((crumb, i) => (
+                  <span key={`${crumb.label}-${i}`} className="flex items-center gap-1.5">
+                    {i > 0 && <span aria-hidden="true" className="text-zinc-300 dark:text-zinc-600">/</span>}
+                    {crumb.href && !crumb.active ? (
+                      <a href={crumb.href} className="transition hover:text-[#0f7b49] dark:hover:text-[#4ade80]">{crumb.label}</a>
+                    ) : (
+                      <span className={crumb.active ? "font-medium text-zinc-900 dark:text-zinc-100" : ""}>{crumb.label}</span>
+                    )}
+                  </span>
+                ))}
+              </nav>
+            ) : subtitle ? (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">{subtitle}</p>
+            ) : null}
+          </div>
+          {topAction && <div className="shrink-0">{topAction}</div>}
+        </header>
 
         <main className="flex-1 overflow-y-auto">
           {children}
