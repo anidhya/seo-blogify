@@ -9,6 +9,7 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 - Styling: Tailwind CSS
 - UI system: shared workspace shell, compact rail navigation, light/dark theme
 - Core domains: brand analysis, topic generation, blog drafting, quality checks, LinkedIn publishing, and Social Studio
+- Auth and publishing workflows: Google OAuth, passwordless magic-link sign-in, article-to-Social Studio handoff, and LinkedIn carousel generation
 - Source of truth for visual decisions: `design.md`
 
 ## Common Commands
@@ -23,6 +24,7 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 - Apply Postgres migrations: `npm run db:migrate`
 - Backfill file-store data into Postgres: `npm run db:backfill`
 - Repair migrated storage rows: `npm run db:repair`
+- Preview repair changes without writing: `npm run db:repair -- --dry-run` or `DRY_RUN=1 npm run db:repair`
 - Verify migration coverage: `npm run db:verify`
 
 ## Where Things Live
@@ -37,6 +39,7 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 - Business logic and utilities: `lib/`
 - Reusable workflow skills: `skills/seo-friendly-topics/`, `skills/seo-friendly-articles/`, `skills/dataforseo-seo-research/`
 - Database migration, backfill, repair, verification, and brand-guideline parsing helpers: `scripts/`
+- The DB helper scripts load `.env.local` automatically through `scripts/env.mjs`
 - Design guidance: `design.md`
 - Product summary and setup notes: `README.md`
 
