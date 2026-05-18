@@ -33,8 +33,7 @@ Users authenticate via Google OAuth or passwordless magic link email. Runs are c
 | SEO data | DataForSEO (keyword metrics + live SERP) |
 | Auth | Google OAuth 2.0 + magic links (Resend) + HMAC-SHA256 session cookies |
 | Database | PostgreSQL + Drizzle ORM + pgvector (brands, users, orgs, oauth tokens) |
-| Workflow storage (dev) | Local filesystem under `data/` |
-| Workflow storage (prod) | Vercel Blob (`BLOB_READ_WRITE_TOKEN`) |
+| Workflow storage (dev and prod) | PostgreSQL (`runs`, `run_artifacts`, `social_projects`, `social_assets`) |
 | Validation | Zod throughout — schemas in `lib/schemas.ts`, duplicated locally in `lib/openai.ts` |
 
 ### Data Flow
@@ -69,8 +68,8 @@ POST /api/workflow { step: "generate-blog" }
 | Users, orgs, memberships, auth | PostgreSQL (`users`, `organizations`, `memberships`, `auth_accounts`, `auth_magic_links`) |
 | Brand profiles + vector embeddings | PostgreSQL (`brands`, `brand_documents`, `brand_chunks`) |
 | OAuth connection tokens | PostgreSQL (`oauth_connections`) |
-| Workflow artifacts (manifest, research, topics, blog, linkedin) | Flat JSON files — blob prefix `runs/<runId>/` (prod) or `data/runs/<runId>/` (dev) |
-| Social project content | Flat JSON files — blob prefix `social/<projectId>/` |
+| Workflow artifacts (manifest, research, topics, blog, linkedin) | PostgreSQL `run_artifacts` rows |
+| Social project content | PostgreSQL `social_projects` / `social_project_platforms` rows |
 
 ---
 
@@ -80,39 +79,40 @@ POST /api/workflow { step: "generate-blog" }
 
 Google OAuth + magic link email auth is fully in place. The middleware (`middleware.ts`) protects all routes except `/login` and `/api/auth/*`. Sessions are HMAC-SHA256 signed cookies with a 7-day TTL.
 
-**Remaining gap:** Workflow runs in the blob layer are identified only by `runId`. The `runs` DB table has an `organization_id` column but is not populated by the workflow. A user who guesses a `runId` can still read and mutate that run via `/api/workflow` without belonging to the owning org. The DB ownership model needs to be the enforced access gate, not the blob key.
+**Remaining gap:** Workflow runs are identified only by `runId`. The `runs` DB table has an `organization_id` column but is not enforced as an access gate by the workflow handlers. A user who guesses a `runId` can still read and mutate that run via `/api/workflow` without belonging to the owning org. The DB ownership model needs to be enforced in the request path, not just stored in the row.
 
 ---
 
 ### Issue #1 — Serverless Function Timeout Risk (Critical, unchanged)
 
-Every workflow step runs synchronously in a single serverless function invocation. `suggest-topics` alone chains 3 rounds × N OpenAI calls + 1 DataForSEO call + up to 10 SERP lookups. `generate-blog` runs up to 3 sequential completions plus 3 quality evaluations. These chains regularly exceed 60 seconds on Vercel's default function timeout.
+Every workflow step runs synchronously in a single serverless function invocation. `suggest-topics` alone chains 3 rounds × N OpenAI calls + 1 DataForSEO call + up to 10 SERP lookups. `generate-blog` runs up to 3 sequential completions plus 3 quality evaluations. These chains regularly exceed 60 seconds on a typical serverless timeout.
 
 **Impact:** Production deployments silently fail mid-workflow. The manifest progress stalls and users have no recovery path.
 
-**Fix:** Move long steps to a queue-backed pattern (Vercel Queue, Trigger.dev) or split steps into sub-steps each finishing in < 30 s and chain them client-side via Server-Sent Events. The `setProgress` infrastructure is already in place — it just needs to run outside the 60-second wall.
+**Fix:** Move long steps to a queue-backed pattern or split steps into sub-steps each finishing in < 30 s and chain them client-side via Server-Sent Events. The `setProgress` infrastructure is already in place — it just needs to run outside the 60-second wall.
 
 ---
 
-### Issue #2 — `loadRun()` Issues 16 Sequential Awaits (High, unchanged)
+### Issue #2 — `loadRun()` Still Needs Query Batching (High, unchanged)
 
 ```ts
 // lib/storage.ts
-const manifest = await readJson(...);
-const input    = await readJson(...);
-const research = await readJson(...);
-// ... 13 more sequential awaits
+const [runRows, artifacts, brandGuidelines] = await Promise.all([
+  db`select ... from runs ...`,
+  loadRunArtifactsFromDb(runId),
+  loadRunBrandGuidelinesFromDb(runId)
+]);
 ```
 
-On Vercel Blob each `readJson` is a separate HTTPS round-trip (~50–150 ms). A single `loadRun()` costs ~800–2400 ms of avoidable latency and is called on every API request and multiple times within a single workflow step.
+On Postgres each separate query is a network round-trip plus server-side work. `loadRun()` is already better than the old file-store path, but it still does enough work that a few extra round trips are noticeable on the hot path.
 
-**Fix:** `Promise.all([...])` all 16 reads. Estimated improvement: ~1600 ms → ~150 ms per call.
+**Fix:** Keep the existing `Promise.all(...)` structure and collapse any remaining independent queries or post-processing into a single batch where practical.
 
 ---
 
 ### Issue #4 — OAuth Tokens Stored in Plaintext (Partially resolved)
 
-**Progress:** LinkedIn and social OAuth tokens have been moved from raw blob JSON into the `oauth_connections` PostgreSQL table — a meaningful improvement over the previous state.
+**Progress:** LinkedIn and social OAuth tokens live in the `oauth_connections` PostgreSQL table — a meaningful improvement over the previous state.
 
 **Remaining risk:** The `access_token` and `refresh_token` columns are plaintext `text` fields. Any database credential leak, query log capture, or pg_dump exposure reveals live tokens directly.
 
@@ -128,13 +128,13 @@ On Vercel Blob each `readJson` is a separate HTTPS round-trip (~50–150 ms). A 
 
 ---
 
-### Issue #6 — Dual Storage Split Creates Silent Inconsistency (New, High)
+### Issue #6 — Social Assets Need DB Backing Everywhere (New, High)
 
-The `runs` and `run_artifacts` DB tables exist with the right shape (`artifact_type`, `payload` JSONB, `markdown_text`) but the workflow writes exclusively to blob/local JSON. The DB `runs` table row does not reflect the actual artifact state — status, manifest progress, and content live only in the JSON files.
+The generated Instagram SVGs are intended to live in Postgres, but the Social Studio still needs to consistently treat those assets as database records rather than file paths. Any helper that assumes the asset exists on disk will break public publish URLs or deletions.
 
-**Impact:** Any DB query for runs (e.g. "find all published articles for this org") returns stale or empty data. The `runs.status` column and `run_artifacts` table are effectively unused. As features that read from the DB are added, this split will cause data integrity bugs that are hard to diagnose.
+**Impact:** Missing rows or mismatched asset paths will produce broken image URLs during Instagram publishing and stale public assets after project deletion.
 
-**Fix:** Wire the workflow write path to populate `run_artifacts` alongside the blob write. The `artifact_type` column maps directly to the existing step names (`analysis`, `topics`, `blog`, `quality`, `linkedin`). Use a dual-write transition period, then remove the blob dependency for artifact reads.
+**Fix:** Keep the asset save/load/delete helpers strictly DB-backed, and make sure asset cleanup follows `social_projects` deletion through cascade or explicit deletion in the same transaction.
 
 ---
 
@@ -142,7 +142,7 @@ The `runs` and `run_artifacts` DB tables exist with the right shape (`artifact_t
 
 All API routes (`/api/workflow`, `/api/social`, `/api/brand-guidelines`) accept unlimited requests from any authenticated user. A single user can fire dozens of expensive OpenAI + DataForSEO calls per second, running up API costs with no guard.
 
-**Fix:** Add request rate limiting at the edge using Vercel's `@vercel/kv` or a middleware-level in-memory counter. A simple per-user, per-minute limit on the `/api/workflow` POST endpoint (e.g. 10 requests/min) eliminates the abuse surface. Upstash rate limiting integrates with Next.js middleware in ~20 lines.
+**Fix:** Add request rate limiting at the edge using a dedicated key-value store or a middleware-level in-memory counter. A simple per-user, per-minute limit on the `/api/workflow` POST endpoint (e.g. 10 requests/min) eliminates the abuse surface. Upstash rate limiting integrates with Next.js middleware in ~20 lines.
 
 ---
 
@@ -263,10 +263,10 @@ The current schema has solid foundations — well-normalized, pgvector for embed
 
 The `runs` and `run_artifacts` tables already have the right shape. The migration path:
 
-1. Wire the workflow write path to insert/update `run_artifacts` rows (dual-write alongside blob)
-2. Wire `loadRun()` to read from DB when the row exists, fall back to blob for legacy runs
-3. Backfill existing blob runs into DB rows via a migration script
-4. Remove blob reads from the hot path
+1. Batch any remaining independent `loadRun()` queries
+2. Keep the Social Studio asset path DB-backed end to end
+3. Enforce `organization_id` ownership checks in the workflow handlers
+4. Add any missing composite indexes that help hot-path queries
 
 This enables proper queries: "find all approved articles across all brands for this org", "list runs by status", "show articles needing review" — none of which are possible against flat JSON files.
 
@@ -307,7 +307,7 @@ CREATE TABLE keyword_rankings (
 
 **D. Add `scheduled_posts` table**
 
-The current `scheduledFor` timestamp is buried in blob JSON and cannot be queried by a cron job without reading every run's JSON file. Replace it with a queryable table:
+The current `scheduledFor` timestamp is buried in run JSON and cannot be queried by a cron job without reading every run's JSON file. Replace it with a queryable table:
 
 ```sql
 CREATE TABLE scheduled_posts (
@@ -323,7 +323,7 @@ CREATE TABLE scheduled_posts (
 CREATE INDEX ON scheduled_posts(scheduled_for, fired_at) WHERE fired_at IS NULL;
 ```
 
-A Vercel Cron hitting `/api/cron/publish-scheduled` can then do a single indexed query: `WHERE scheduled_for <= now() AND fired_at IS NULL`.
+A scheduled job hitting `/api/cron/publish-scheduled` can then do a single indexed query: `WHERE scheduled_for <= now() AND fired_at IS NULL`.
 
 **E. Encrypt OAuth token columns**
 
@@ -335,7 +335,7 @@ The `UNIQUE(provider, entity_type, entity_id)` constraint uses `entity_id` which
 
 **G. Add stale magic link cleanup**
 
-`auth_magic_links` rows accumulate indefinitely. Add a Vercel Cron job or a trigger that runs `DELETE FROM auth_magic_links WHERE expires_at < NOW()` periodically. Alternatively, add a partial index and let the application clean up on consumption: the `consumed_at IS NULL AND expires_at < NOW()` rows are dead weight.
+`auth_magic_links` rows accumulate indefinitely. Add a scheduled job or a trigger that runs `DELETE FROM auth_magic_links WHERE expires_at < NOW()` periodically. Alternatively, add a partial index and let the application clean up on consumption: the `consumed_at IS NULL AND expires_at < NOW()` rows are dead weight.
 
 ---
 
@@ -423,7 +423,7 @@ These were proposed in the initial review and remain unimplemented:
 - **DB schema is well-normalized.** Cascade deletes are correctly configured throughout. The `brand_chunks` + pgvector HNSW index with `vector_cosine_ops` is production-ready.
 - **Typed end-to-end.** Zod validates every artifact at write time. TypeScript strict mode catches most shape mismatches at build time. `RunBundle` provides a well-typed aggregate read model.
 - **Quality gate is real.** The 80-point threshold, 2-pass rewrite loop, and structured evaluation scores are genuinely useful and not cosmetic.
-- **Storage abstraction is clean.** The `readJson`/`writeJson` helpers and `USE_BLOB_STORAGE` flag make local development frictionless.
+- **Storage abstraction is clean.** The database-backed read/write helpers keep the workflow bundle and Social Studio state in a single source of truth.
 - **Fallback patterns are solid.** `buildFallbackLinkedInDraft` and `buildFallbackSocialPack` ensure the workflow never fully stalls on an LLM parse failure.
 
 ### Areas to Address
@@ -450,7 +450,7 @@ These were proposed in the initial review and remain unimplemented:
 
 1. **Fix default model name** — 5 min
 2. **Parallelize `loadRun()`** with `Promise.all` — 30 min
-3. **Scope blob runs to authenticated org** — verify runId ownership in `/api/workflow` — 1 day
+3. **Scope runs to authenticated org** — verify runId ownership in `/api/workflow` — 1 day
 4. **Encrypt OAuth tokens** — AES-256-GCM helper + migration — 1 day
 5. **Add React error boundaries** to workspace, editor, social studio — 2 hours
 6. **Fix `oauth_connections` unique constraint** — 1 migration file

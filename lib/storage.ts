@@ -1,7 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { readdir, rm } from "node:fs/promises";
-import path from "node:path";
-import { del as deleteBlob, list as listBlobs } from "@vercel/blob";
 import type { TransactionSql } from "postgres";
 import { getDb } from "@/lib/db/client";
 import {
@@ -68,15 +65,6 @@ import type {
   SocialProjectSummary
 } from "@/lib/types";
 
-const STORAGE_ROOT = process.env.DATA_ROOT
-  ? path.resolve(process.env.DATA_ROOT)
-  : process.env.VERCEL === "1"
-    ? path.join("/tmp", "blogify-data")
-    : path.join(process.cwd(), "data");
-const DATA_ROOT = path.join(STORAGE_ROOT, "runs");
-const SOCIAL_ROOT = path.join(STORAGE_ROOT, "social");
-const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
-const USE_BLOB_STORAGE = Boolean(BLOB_TOKEN);
 const SCHEMA_VERSION = "1" as const;
 const DEFAULT_ORGANIZATION_ID = "workspace-default";
 const DEFAULT_ORGANIZATION_SLUG = "workspace";
@@ -277,18 +265,6 @@ export type RunBundle = {
   linkedin: RunLinkedInArticlesRecord | null;
   brandGuidelines: RunBrandGuidelinesRecord | null;
 };
-
-function runDir(runId: string) {
-  return path.join(DATA_ROOT, runId);
-}
-
-function blobPath(...segments: string[]) {
-  return path.posix.join(...segments);
-}
-
-function blobOptions() {
-  return BLOB_TOKEN ? { token: BLOB_TOKEN } : {};
-}
 
 function nowIso() {
   return new Date().toISOString();
@@ -1135,52 +1111,6 @@ export async function removeBrandGuidelineFile(domain: string, fileId: string) {
   });
 }
 
-async function listRunIdsFromBlobs() {
-  const runIds = new Set<string>();
-  let cursor: string | undefined;
-
-  do {
-    const page = await listBlobs({
-      prefix: "runs/",
-      mode: "expanded",
-      cursor,
-      ...blobOptions()
-    });
-
-    for (const blob of page.blobs) {
-      const [, runId] = blob.pathname.split("/");
-      if (runId) {
-        runIds.add(runId);
-      }
-    }
-
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-
-  return Array.from(runIds);
-}
-
-async function deleteRunBlobs(runId: string) {
-  const paths: string[] = [];
-  let cursor: string | undefined;
-  const prefix = blobPath("runs", runId) + "/";
-
-  do {
-    const page = await listBlobs({
-      prefix,
-      mode: "expanded",
-      cursor,
-      ...blobOptions()
-    });
-
-    paths.push(...page.blobs.map((blob) => blob.pathname));
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-
-  if (paths.length) {
-    await deleteBlob(paths, blobOptions());
-  }
-}
 
 function countWords(markdown: string) {
   return markdown
@@ -1701,53 +1631,6 @@ export async function saveLinkedInPublication(runId: string, articleSlug: string
   });
 }
 
-async function listSocialProjectIdsFromBlobs() {
-  const projectIds = new Set<string>();
-  let cursor: string | undefined;
-
-  do {
-    const page = await listBlobs({
-      prefix: "social/",
-      mode: "expanded",
-      cursor,
-      ...blobOptions()
-    });
-
-    for (const blob of page.blobs) {
-      const [, projectId] = blob.pathname.split("/");
-      if (projectId) {
-        projectIds.add(projectId);
-      }
-    }
-
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-
-  return Array.from(projectIds);
-}
-
-async function deleteSocialProjectBlobs(projectId: string) {
-  const paths: string[] = [];
-  let cursor: string | undefined;
-  const prefix = blobPath("social", projectId) + "/";
-
-  do {
-    const page = await listBlobs({
-      prefix,
-      mode: "expanded",
-      cursor,
-      ...blobOptions()
-    });
-
-    paths.push(...page.blobs.map((blob) => blob.pathname));
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-
-  if (paths.length) {
-    await deleteBlob(paths, blobOptions());
-  }
-}
-
 export function createSocialProjectId(topic?: string) {
   const slug = (topic || "social").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   return `${new Date().toISOString().slice(0, 10)}_${slug || "social"}_${randomUUID().slice(0, 8)}`;
@@ -1816,30 +1699,22 @@ export async function deleteSocialOAuthState(state: string) {
 
 export async function deleteSocialProject(projectId: string) {
   const db = getDb();
-  if (db) {
-    await db`
-      delete from oauth_connections
-      where entity_type = ${"social_project_platform"}
-        and entity_id like ${`${projectId}:%`}
-    `;
+  if (!db) {
+    throw new Error("DATABASE_URL is required to delete social projects.");
   }
 
+  await db`
+    delete from oauth_connections
+    where entity_type = ${"social_project_platform"}
+      and entity_id like ${`${projectId}:%`}
+  `;
   await deleteSocialProjectFromDb(projectId);
-  if (USE_BLOB_STORAGE) {
-    await deleteSocialProjectBlobs(projectId);
-  } else {
-    await rm(path.join(SOCIAL_ROOT, projectId), { recursive: true, force: true });
-  }
   return true;
 }
 
 export async function listSocialProjectSummaries(): Promise<SocialProjectSummary[]> {
   const dbProjectIds = await listSocialProjectIdsFromDb();
-  const projectIds = dbProjectIds.length
-    ? dbProjectIds
-    : USE_BLOB_STORAGE
-      ? await listSocialProjectIdsFromBlobs()
-      : await listSocialProjectIds();
+  const projectIds = dbProjectIds;
   const projects = await Promise.all(projectIds.map((projectId) => loadSocialProject(projectId)));
 
   return projects
@@ -2140,14 +2015,10 @@ export async function deleteLinkedInOAuthStatesForRun(runId: string) {
 export async function deleteRun(runId: string) {
   await deleteLinkedInOAuthStatesForRun(runId);
   const db = getDb();
-  if (db) {
-    await db`delete from runs where id = ${runId}`;
+  if (!db) {
+    throw new Error("DATABASE_URL is required to delete runs.");
   }
-  if (USE_BLOB_STORAGE) {
-    await deleteRunBlobs(runId);
-  } else {
-    await rm(runDir(runId), { recursive: true, force: true });
-  }
+  await db`delete from runs where id = ${runId}`;
   return true;
 }
 
@@ -2233,30 +2104,11 @@ export async function listRunSummaries(): Promise<RunSummary[]> {
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
-async function listSocialProjectIds() {
-  try {
-    const entries = await readdir(SOCIAL_ROOT, { withFileTypes: true });
-    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
-  } catch {
-    return [];
-  }
-}
-
 export async function listRuns() {
   const db = getDb();
-  if (db) {
-    const rows = await db`select id from runs order by updated_at desc`;
-    return rows.map((row) => row.id as string);
+  if (!db) {
+    throw new Error("DATABASE_URL is required to list runs.");
   }
-
-  if (USE_BLOB_STORAGE) {
-    return listRunIdsFromBlobs();
-  }
-
-  try {
-    const entries = await readdir(DATA_ROOT, { withFileTypes: true });
-    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
-  } catch {
-    return [];
-  }
+  const rows = await db`select id from runs order by updated_at desc`;
+  return rows.map((row) => row.id as string);
 }

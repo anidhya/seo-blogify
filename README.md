@@ -20,7 +20,7 @@ Marketier AI is a Next.js app that turns a company website and supporting blog U
 - supports LinkedIn OAuth connection, approval, scheduling, and publish-now actions
 - provides a separate Social Studio for URL- or topic-based Instagram, LinkedIn, and X drafts with editing, comments, scheduling, and platform connections
 - supports Google OAuth login and passwordless magic-link signup/sign-in
-- stores workflow data in Postgres through the configured `DATABASE_URL`
+- stores workflow data, social projects, and generated social assets in Postgres through the configured `DATABASE_URL`
 - keeps unreachable homepage and blog URLs as explicit unavailable snapshots so research never stops at a dead end
 
 ## Main screens
@@ -132,7 +132,7 @@ Core records:
 
 ## Database and migration helpers
 
-- PostgreSQL is used for workflow runs, social projects, brand-guideline retrieval, and storage helpers.
+- PostgreSQL is used for workflow runs, social projects, generated social assets, brand-guideline retrieval, and all runtime storage helpers.
 - Migration, backfill, repair, and verification scripts live under `scripts/`.
 - Use `DATABASE_URL` for Railway Postgres in both local development and deployment.
 
