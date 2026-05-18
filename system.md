@@ -28,35 +28,20 @@ Browser
          LinkedIn API                 OAuth + post publishing
          Meta Graph API               Instagram OAuth + publish
          X (Twitter) API              OAuth + tweet posting
-         Vercel Blob                  Production artifact storage
+         PostgreSQL                   Workflow, social, and asset storage
 ```
 
 ### Storage Layout
 
 ```
-Production (Vercel Blob):              Development (local FS):
-  runs/<runId>/manifest.json             data/runs/<runId>/manifest.json
-  runs/<runId>/input.json                data/runs/<runId>/input.json
-  runs/<runId>/research.json             ...
-  runs/<runId>/analysis.json
-  runs/<runId>/existing-topics.json
-  runs/<runId>/topic-candidates.json
-  runs/<runId>/topics.json
-  runs/<runId>/topic-validation.json
-  runs/<runId>/topic-research.json
-  runs/<runId>/approved-topic.json
-  runs/<runId>/blog.json
-  runs/<runId>/blog.md
-  runs/<runId>/quality.json
-  runs/<runId>/blog-revisions.json
-  runs/<runId>/regeneration-notes.json
-  runs/<runId>/approvals.json
-  runs/<runId>/approved-articles.json
-  runs/<runId>/linkedin.json
-
-  social/<projectId>/project.json
-  social/oauth-states.json
-  linkedin/oauth-states.json
+Production and development:
+  runs               workflow manifest + input + status
+  run_artifacts      workflow payloads and markdown
+  social_projects    Social Studio projects
+  social_project_platforms
+  social_assets      generated Instagram SVGs and similar public assets
+  oauth_connections  social and LinkedIn OAuth tokens
+  oauth_states       auth callbacks and pending social/LinkedIn OAuth handshakes
 ```
 
 ### Key Design Decisions Today
@@ -64,11 +49,11 @@ Production (Vercel Blob):              Development (local FS):
 | Decision | Current choice | Trade-off |
 |---|---|---|
 | Workflow execution | Synchronous HTTP | Simple but hits serverless timeout on long steps |
-| Storage | Flat JSON files | Zero infrastructure but no querying, no transactions |
+| Storage | PostgreSQL tables | Queryable and transactional, but needs schema discipline |
 | Auth | None (runId as implicit token) | Frictionless but no user isolation |
 | AI provider | OpenAI only | Deep integration but no fallback or model choice |
 | Progress reporting | Client polls manifest.json | Works but adds extra API calls |
-| Token storage | Plain JSON in blob | Convenient but tokens are unencrypted |
+| Token storage | Plain JSON files | Convenient but tokens are unencrypted |
 
 ---
 
@@ -80,7 +65,7 @@ The changes below are ordered from highest-leverage (fix a real breaking risk) t
 
 ### 1. Async Workflow Execution (Critical)
 
-**Problem:** A single `POST /api/workflow` handles steps that chain 5–12 sequential LLM calls plus external API requests. This easily exceeds the 60-second Vercel Function timeout, especially `suggest-topics` (3 rounds of OpenAI + DataForSEO + SERP validation) and `generate-blog` (draft + 2 rewrites + 3 quality passes).
+**Problem:** A single `POST /api/workflow` handles steps that chain 5–12 sequential LLM calls plus external API requests. This easily exceeds a typical 60-second serverless timeout, especially `suggest-topics` (3 rounds of OpenAI + DataForSEO + SERP validation) and `generate-blog` (draft + 2 rewrites + 3 quality passes).
 
 **Proposed design:**
 
@@ -94,7 +79,7 @@ Browser
   │     Streams manifest progress events to the browser
   │     Browser already renders a <WorkflowProgress> component — wire it to SSE
   │
-  └── Background worker (Vercel Queue / Trigger.dev / GitHub Actions webhook)
+  └── Background worker (queue service / Trigger.dev / GitHub Actions webhook)
         Consumes the job, runs the full step, writes artifacts + updates manifest
         Retries on failure up to 3× before marking the run as errored
 ```
@@ -113,25 +98,24 @@ Browser
 
 ### 2. Parallel `loadRun()` Reads
 
-**Problem:** `loadRun()` issues 16 sequential `await readJson(...)` calls. On Vercel Blob, each is an HTTPS request (~100 ms). Total cold-read latency: ~1600 ms per call.
+**Problem:** `loadRun()` still assembles a bundle from several sequential queries and JSON parses. Without batching, total cold-read latency can easily reach ~1000 ms per call.
 
 **Fix:**
 
 ```ts
-// lib/storage.ts — replace sequential awaits with Promise.all
+// lib/storage.ts — batch the hot-path read
 export async function loadRun(runId: string): Promise<RunBundle> {
-  const [manifest, input, research, analysis, existingTopics, /* ... */] = await Promise.all([
-    readJson<RunManifest>(runId, "manifest.json"),
-    readJson<RunInputRecord>(runId, "input.json"),
-    readJson<RunResearchRecord>(runId, "research.json"),
-    // ... all 16 files
+  const [runRows, artifacts, brandGuidelines] = await Promise.all([
+    db`select r.*, b.name as brand_name, b.domain as brand_domain from runs r left join brands b on b.id = r.brand_id where r.id = ${runId} limit 1`,
+    loadRunArtifactsFromDb(runId),
+    loadRunBrandGuidelinesFromDb(runId)
   ]);
 
-  return { manifest, input, research, /* ... */ };
+  return { /* normalized bundle */ };
 }
 ```
 
-**Estimated improvement:** ~1600 ms → ~150 ms per `loadRun()` call on Vercel Blob.
+**Estimated improvement:** ~1600 ms → ~150 ms per `loadRun()` call.
 
 ---
 
@@ -168,8 +152,8 @@ Phase 2 — Team workspaces
 **Proposed design:**
 
 ```
-Option A (simplest): Vercel KV + AES-256 encryption
-  - Store tokens as encrypted blobs in Vercel KV keyed by <workspaceId>:<platform>
+Option A (simplest): Postgres + AES-256 encryption
+  - Store tokens as encrypted rows keyed by <workspaceId>:<platform>
   - Store only a non-secret reference token ID in the JSON artifact
   - Rotate encryption key via environment variable
 
@@ -179,7 +163,7 @@ Option B (production): A dedicated secrets layer
   - Token retrieval happens server-side only, never sent to the browser
 ```
 
-**Minimum viable fix:** AES-256 encrypt token values before writing to blob, decrypt on read. Add `ENCRYPTION_KEY` environment variable. Two helper functions in `lib/crypto.ts`.
+**Minimum viable fix:** AES-256 encrypt token values before writing to disk, decrypt on read. Add `ENCRYPTION_KEY` environment variable. Two helper functions in `lib/crypto.ts`.
 
 ---
 
@@ -190,7 +174,7 @@ Option B (production): A dedicated secrets layer
 **Proposed design:**
 
 ```
-Database: PostgreSQL (Neon serverless, Vercel Postgres, or Supabase)
+Database: PostgreSQL (Neon serverless or Supabase)
 
 Tables:
   workspaces      (id, name, created_at)
@@ -249,7 +233,7 @@ interface CmsAdapter {
 **Proposed design:**
 
 ```
-Vercel Cron (vercel.json):
+Cron job (deployment scheduler):
   {
     "crons": [
       { "path": "/api/cron/publish-scheduled", "schedule": "*/5 * * * *" }
@@ -265,7 +249,7 @@ GET /api/cron/publish-scheduled
   3. Same logic for Social Studio schedules
 ```
 
-**Authentication:** Vercel Cron routes automatically include a `x-vercel-cron` header. Validate it to prevent unauthorized triggering.
+**Authentication:** Scheduled job requests should include a shared secret or signed header. Validate it to prevent unauthorized triggering.
 
 ---
 
@@ -305,7 +289,7 @@ The existing `WorkflowProgress` component (`app/components/workflow-progress.tsx
 ### Phase 2 — Reliability and Scale (2–4 weeks)
 
 5. **Async workflow execution** — SSE progress stream + background runner — 1 week
-6. **Scheduled publish cron** — Vercel Cron + publish handler — 2 days
+6. **Scheduled publish cron** — scheduled job + publish handler — 2 days
 7. **Remove duplicate Zod schemas** — consolidate `lib/openai.ts` schemas into `lib/schemas.ts` — 2 hours
 
 ### Phase 3 — Growth Features (1–2 months)

@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { put as putBlob } from "@vercel/blob";
 import type { SocialConnection, SocialPlatform, SocialPlatformRecord, SocialVariant } from "@/lib/types";
+import { saveSocialAsset } from "@/lib/social-assets";
 
 type XConfig = {
   clientId: string;
@@ -278,13 +278,16 @@ function buildInstagramSlideSvg(params: {
 }
 
 async function uploadPublicSvgAsset(pathname: string, svg: string) {
-  const result = await putBlob(pathname, svg, {
-    access: "public",
-    contentType: "image/svg+xml",
-    addRandomSuffix: true
+  const projectId = pathname.split("/")[1] || "unknown";
+  await saveSocialAsset({
+    assetPath: pathname,
+    projectId,
+    mimeType: "image/svg+xml",
+    body: svg
   });
 
-  return result.url;
+  const baseUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return new URL(`/api/social-assets/${pathname}`, baseUrl).toString();
 }
 
 async function requestJson<T>(url: string, init: RequestInit) {
