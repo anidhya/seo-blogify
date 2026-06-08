@@ -26,12 +26,17 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 - Repair migrated storage rows: `npm run db:repair`
 - Preview repair changes without writing: `npm run db:repair -- --dry-run` or `DRY_RUN=1 npm run db:repair`
 - Verify migration coverage: `npm run db:verify`
+- Parse a PDF or DOCX brand-guideline upload into text: `node scripts/brand-guideline-parser.mjs <file>`
 
 ## Where Things Live
 
 - App routes and screens: `app/`
+- Authentication routes and flows: `app/login/`, `app/api/auth/`
 - Social Studio and APIs: `app/social/`, `app/api/social/`
+- Workflow orchestration API: `app/api/workflow/`
+- Social asset delivery: `app/api/social-assets/`
 - LinkedIn and Social Studio OAuth/connect routes: `app/api/linkedin/`, `app/api/social/[projectId]/connect/`, `app/api/social/connect/callback/`
+- Brand-guideline uploads and parsing: `app/api/brand-guidelines/`, `app/runs/[runId]/brand-guidelines-panel.tsx`, `scripts/brand-guideline-parser.mjs`
 - Profile and FAQ screens: `app/profiles/`, `app/faq/`
 - Run workspace and article views: `app/runs/[runId]/`, `app/runs/[runId]/articles/`, `app/runs/[runId]/blog/[slug]/`, `app/runs/[runId]/blog/[slug]/linkedin/`
 - Shared UI components: `app/components/`
