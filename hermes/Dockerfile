@@ -12,7 +12,8 @@ RUN git clone https://github.com/nesquena/hermes-webui.git /opt/hermes-webui
 # Install the webui's two hard deps into the agent's existing venv at /opt/hermes/.venv.
 # The venv already has all hermes-agent Python deps, so `from run_agent import AIAgent`
 # works without any additional install step at startup.
-RUN /opt/hermes/.venv/bin/pip install --quiet --no-cache-dir \
+RUN uv pip install --quiet --no-cache-dir \
+    --python /opt/hermes/.venv/bin/python \
     "pyyaml>=6.0" "cryptography>=42.0"
 
 # Bind all interfaces (required for Railway's port routing)
