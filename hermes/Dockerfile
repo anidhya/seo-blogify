@@ -2,37 +2,34 @@ FROM nousresearch/hermes-agent:main
 
 USER root
 
-# git to clone webui; python3 + venv for the webui process
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git python3 python3-pip python3-venv && \
+# Only git is needed — the agent image already has python3 and its own venv
+RUN apt-get update && apt-get install -y --no-install-recommends git && \
     rm -rf /var/lib/apt/lists/*
 
-# Clone hermes-webui (update the commit hash to pull a newer release)
+# Clone hermes-webui
 RUN git clone https://github.com/nesquena/hermes-webui.git /opt/hermes-webui
 
-# Dedicated venv for the webui process so it never touches the agent's venv.
-# Pre-install webui hard deps + all hermes-agent deps so `from run_agent import AIAgent`
-# works without hitting the network at container startup.
-RUN python3 -m venv /opt/hermes-webui/.venv && \
-    /opt/hermes-webui/.venv/bin/pip install --quiet --no-cache-dir \
-        "pyyaml>=6.0" "cryptography>=42.0" && \
-    /opt/hermes-webui/.venv/bin/pip install --quiet --no-cache-dir \
-        -r /opt/hermes/requirements.txt
+# Install the webui's two hard deps into the agent's existing venv at /opt/hermes/.venv.
+# The venv already has all hermes-agent Python deps, so `from run_agent import AIAgent`
+# works without any additional install step at startup.
+RUN /opt/hermes/.venv/bin/pip install --quiet --no-cache-dir \
+    "pyyaml>=6.0" "cryptography>=42.0"
 
 # Bind all interfaces (required for Railway's port routing)
 ENV HERMES_WEBUI_HOST=0.0.0.0
 ENV HERMES_WEBUI_PORT=8787
 
-# Tell webui where to find run_agent.py (added to sys.path by api/config.py)
+# run_agent.py lives at /opt/hermes/run_agent.py — added to sys.path by api/config.py
 ENV HERMES_WEBUI_AGENT_DIR=/opt/hermes
 
-# Set these at Railway runtime — not hardcoded here so the Dockerfile is portable:
-#   HERMES_HOME              e.g. /opt/data  (must match the volume mount path)
-#   HERMES_WEBUI_STATE_DIR   e.g. /opt/data/webui
-#   HERMES_WEBUI_PASSWORD    required — anyone who reaches port 8787 can run commands
+# Set these at Railway runtime:
+#   HERMES_HOME            e.g. /opt/data  (must match the volume mount path)
+#   HERMES_WEBUI_PASSWORD  required — anyone who reaches port 8787 can run commands
 
 EXPOSE 8787
 
-# Run the hermes gateway + the webui side-by-side in one container.
-# The CMD is used when no start command override is set in Railway.
-CMD ["sh", "-lc", "cd /opt/hermes-webui && .venv/bin/python server.py & exec /opt/hermes/bin/hermes gateway run"]
+# No CMD override — the Railway start command drives process startup.
+# main-wrapper.sh (the ENTRYPOINT script) activates /opt/hermes/.venv before
+# routing, so `python` resolves to the venv Python automatically.
+# Set this as the start command in Railway:
+#   sh -lc 'cd /opt/hermes-webui && python server.py & exec /opt/hermes/bin/hermes gateway run'
