@@ -9,7 +9,7 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 - Styling: Tailwind CSS
 - UI system: shared workspace shell, compact rail navigation, light/dark theme
 - Core domains: brand analysis, topic generation, blog drafting, quality checks, LinkedIn publishing, and Social Studio
-- Auth and publishing workflows: Google OAuth, passwordless magic-link sign-in, article-to-Social Studio handoff, and LinkedIn carousel generation
+- Auth and publishing workflows: Google OAuth, passwordless magic-link sign-in, article-to-Social Studio handoff, LinkedIn carousel generation, and Google AI Studio image generation
 - Source of truth for visual decisions: `design.md`
 
 ## Common Commands
@@ -31,11 +31,11 @@ This repository is a Next.js app for Marketier AI. When you work here, optimize 
 ## Where Things Live
 
 - App routes and screens: `app/`
-- Authentication routes and flows: `app/login/`, `app/api/auth/`
-- Social Studio and APIs: `app/social/`, `app/api/social/`
+- Authentication routes and flows: `app/login/`, `app/api/auth/google/`, `app/api/auth/magic-link/`, `app/api/auth/logout/`, `app/api/auth/me/`
+- Social Studio and APIs: `app/social/`, `app/social/[projectId]/`, `app/api/social/`, `app/api/social-assets/`
 - Workflow orchestration API: `app/api/workflow/`
-- Social asset delivery: `app/api/social-assets/`
 - LinkedIn and Social Studio OAuth/connect routes: `app/api/linkedin/`, `app/api/social/[projectId]/connect/`, `app/api/social/connect/callback/`
+- Blog-to-Social Studio handoff: `app/runs/[runId]/blog/[slug]/social-handoff-button.tsx`
 - Brand-guideline uploads and parsing: `app/api/brand-guidelines/`, `app/runs/[runId]/brand-guidelines-panel.tsx`, `scripts/brand-guideline-parser.mjs`
 - Profile and FAQ screens: `app/profiles/`, `app/faq/`
 - Run workspace and article views: `app/runs/[runId]/`, `app/runs/[runId]/articles/`, `app/runs/[runId]/blog/[slug]/`, `app/runs/[runId]/blog/[slug]/linkedin/`
