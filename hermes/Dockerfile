@@ -37,6 +37,10 @@ ENV HERMES_WEBUI_PYTHON=/opt/hermes/.venv/bin/python
 # Bind all interfaces (required for Railway's port routing).
 ENV HERMES_WEBUI_HOST=0.0.0.0
 
+# Never derive this from $PORT: the service sets PORT=9119 for the dashboard,
+# which would land webui on the dashboard's port.
+ENV HERMES_WEBUI_PORT=8787
+
 # run_agent.py lives at /opt/hermes/run_agent.py — added to sys.path by api/config.py
 ENV HERMES_WEBUI_AGENT_DIR=/opt/hermes
 
@@ -61,4 +65,4 @@ ENTRYPOINT []
 # background, gateway (8642) in the foreground so its exit code is the
 # container's. A backgrounded process that dies leaves the container up, so a
 # green deploy alone does not prove webui and the dashboard are listening.
-CMD ["sh", "-c", "export HERMES_WEBUI_PORT=\"${PORT:-8787}\"; cd /opt/hermes-webui && /opt/hermes/.venv/bin/python server.py & /opt/hermes/bin/hermes dashboard --host 0.0.0.0 --port 9119 --insecure --no-open & exec /opt/hermes/bin/hermes gateway run"]
+CMD ["sh", "-c", "cd /opt/hermes-webui && /opt/hermes/.venv/bin/python server.py & /opt/hermes/bin/hermes dashboard --host 0.0.0.0 --port 9119 --insecure --no-open & exec /opt/hermes/bin/hermes gateway run"]
