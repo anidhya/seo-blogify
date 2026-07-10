@@ -43,11 +43,22 @@ ENV HERMES_WEBUI_AGENT_DIR=/opt/hermes
 # Set these at Railway runtime:
 #   HERMES_HOME            e.g. /opt/data  (must match the volume mount path)
 #   HERMES_WEBUI_PASSWORD  required — anyone who reaches port 8787 can run commands
+#   HERMES_WEBUI_STATE_DIR e.g. /opt/data/webui. Clearing ENTRYPOINT skips
+#                          main-wrapper.sh, which is what exported HOME=/opt/data,
+#                          so webui would otherwise put state under /root and lose
+#                          it on every redeploy.
 
 EXPOSE 8787
+EXPOSE 9119
 
+# Clearing the base image's ENTRYPOINT bypasses s6-overlay and main-wrapper.sh.
+# That costs us venv activation, the privilege drop to the `hermes` user, and
+# process supervision — so every binary below is called by absolute path, and
+# `sh -c` (not `-lc`) keeps /etc/profile from overwriting PATH.
 ENTRYPOINT []
 
-# main-wrapper.sh (the ENTRYPOINT script) activates /opt/hermes/.venv before
-# routing, so `python` resolves to the venv Python automatically.
-CMD ["sh", "-lc", "export HERMES_WEBUI_PORT=\"${PORT:-8787}\"; cd /opt/hermes-webui && /opt/hermes/.venv/bin/python server.py & exec /opt/hermes/bin/hermes gateway run"]
+# Three processes: webui (8787) and the native dashboard (9119) in the
+# background, gateway (8642) in the foreground so its exit code is the
+# container's. A backgrounded process that dies leaves the container up, so a
+# green deploy alone does not prove webui and the dashboard are listening.
+CMD ["sh", "-c", "export HERMES_WEBUI_PORT=\"${PORT:-8787}\"; cd /opt/hermes-webui && /opt/hermes/.venv/bin/python server.py & /opt/hermes/bin/hermes dashboard --host 0.0.0.0 --port 9119 --insecure --no-open & exec /opt/hermes/bin/hermes gateway run"]
