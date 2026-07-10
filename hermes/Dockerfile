@@ -65,4 +65,11 @@ ENTRYPOINT []
 # background, gateway (8642) in the foreground so its exit code is the
 # container's. A backgrounded process that dies leaves the container up, so a
 # green deploy alone does not prove webui and the dashboard are listening.
-CMD ["sh", "-c", "cd /opt/hermes-webui && /opt/hermes/.venv/bin/python server.py & /opt/hermes/bin/hermes dashboard --host 0.0.0.0 --port 9119 --insecure --no-open & exec /opt/hermes/bin/hermes gateway run"]
+#
+# The dashboard subshell mirrors docker/s6-rc.d/dashboard/run from the base
+# image, which no longer runs here because ENTRYPOINT is cleared: HOME must be
+# /opt/data or dashboard state anchors under /root and is lost on redeploy.
+# No --insecure: since the June 2026 hardening it is accepted but ignored, and
+# a non-loopback bind fails closed unless HERMES_DASHBOARD_BASIC_AUTH_USERNAME
+# and _PASSWORD (or _OAUTH_CLIENT_ID) register an auth provider.
+CMD ["sh", "-c", "cd /opt/hermes-webui && /opt/hermes/.venv/bin/python server.py & (export HOME=/opt/data; cd /opt/data; exec /opt/hermes/bin/hermes dashboard --host \"${HERMES_DASHBOARD_HOST:-0.0.0.0}\" --port \"${HERMES_DASHBOARD_PORT:-9119}\" --no-open) & exec /opt/hermes/bin/hermes gateway run"]
